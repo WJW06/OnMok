@@ -1,8 +1,11 @@
-import './App.css';
+import './Ground.css';
+import './Ground-responsive.css';
 import { useState } from 'react';
 
+// [Game setting (*Don't touch*)]
 const rcCount: number = 18;
 
+// [Game-state variables]
 let isPlaying: boolean = false;
 let turn: number = 0;
 let selectZone: number = -1;
@@ -15,6 +18,7 @@ let isGameEnd: boolean = false;
 export default function Board() {
   const [zones, setZones] = useState<string[]>(Array<string>(rcCount * rcCount).fill(""));
 
+  // [Make Board part]
   type MakeRowProps = {
     offset: number;
   }
@@ -55,22 +59,14 @@ export default function Board() {
     return <button className='zone' onClick={() => SelectZone(index)}>{zones[index]}</button>;
   }
 
+
+  // [GameManager part]
   function StartGame() {
     const startButton = document.querySelector('.start-button');
     if (startButton instanceof HTMLButtonElement) {
       startButton.style.display = 'none';
     }
     isPlaying = true;
-  }
-
-  function StartButton() {
-    if (isPlaying) return <></>;
-
-    return (
-      <button className='start-button' onClick={StartGame}>
-        Start Game
-      </button>
-    );
   }
 
   function InitGameState() {
@@ -257,13 +253,26 @@ export default function Board() {
     }
   }
 
-  function RestartGame() {
-    if (isPlaying) InitGameState();
+
+  // [Make UI part]
+  function StartButton() {
+    if (isPlaying) return <></>;
+
+    return (
+      <button className='start-button' onClick={StartGame}>
+        Start Game
+      </button>
+    );
+  }
+
+  function ResetButton() {
+    return <button className='reset-button' onClick={() => { if (isPlaying) InitGameState(); }}>Reset Game</button>;
   }
 
   return (
-    <>
+    <div className='board-ground'>
       <StartButton></StartButton>
+      <ResetButton></ResetButton>
       <MakeRowZones offset={0}></MakeRowZones>
       <MakeRowZones offset={1}></MakeRowZones>
       <MakeRowZones offset={2}></MakeRowZones>
@@ -282,10 +291,6 @@ export default function Board() {
       <MakeRowZones offset={15}></MakeRowZones>
       <MakeRowZones offset={16}></MakeRowZones>
       <MakeRowZones offset={17}></MakeRowZones>
-
-      <div className='reset-button'>
-        <button onClick={RestartGame}>Reset Game</button>
-      </div>
-    </>
+    </div>
   );
 }

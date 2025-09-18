@@ -1,0 +1,38 @@
+button {
+  padding: 0;
+}
+
+.board-ground {
+  margin-left: 14%;
+}
+
+.board-row {
+  display: grid;
+  grid-template-columns: repeat(18, 40px);
+}
+
+.zone {
+  width: 40px;
+  height: 40px;
+  border: 1px solid black;
+  font-size: 18pt;
+  background-color: goldenrod;
+}
+
+.start-button {
+  width: 200px;
+  height: 80px;
+  font-size: 20pt;
+  position: absolute;
+  margin-top: 320px;
+  margin-left: 280px;
+}
+
+.reset-button {
+  width: 80px;
+  height: 40px;
+  font-size: 12pt;
+  position: absolute;
+  margin-top: 340px;
+  margin-left: 740px;
+}
