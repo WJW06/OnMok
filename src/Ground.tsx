@@ -18,7 +18,7 @@ let isGameEnd: boolean = false;
 export default function Board() {
   const [zones, setZones] = useState<string[]>(Array<string>(rcCount * rcCount).fill(""));
 
-  // [Make Board part]
+  // [Make UI part]
   type MakeRowProps = {
     offset: number;
   }
@@ -59,13 +59,59 @@ export default function Board() {
     return <button className='zone' onClick={() => SelectZone(index)}>{zones[index]}</button>;
   }
 
+  // {UI part}
+  function StartButton() {
+    if (isPlaying) return <></>;
+
+    return (
+      <button className='start-button' onClick={StartGame}>
+        Start Game
+      </button>
+    );
+  }
+
+  function ResetButton() {
+    return <button className='reset-button' onClick={() => { if (isPlaying) InitGameState(); }}>Reset Game</button>;
+  }
+
+  function MakeTurnText() {
+    console.log(isPlaying);
+    if (isPlaying) return <span className='turn-text' style={{ display: 'block' }}>turn: {turn + 1}</span>
+    else return <span className='turn-text' style={{ display: 'none' }}>turn: {turn + 1}</span>
+  }
+
+  // {Chat part}
+  function MakeChatWindow() {
+    return (
+      <div className='chats-div'>
+
+      </div>
+    );
+  }
+
+  function MakeChatInput() {
+    return (
+      <>
+        <span className='nickname'>닉네임: </span><input className='chat-input'></input>
+      </>
+    );
+  }
+
 
   // [GameManager part]
   function StartGame() {
     const startButton = document.querySelector('.start-button');
     if (startButton instanceof HTMLButtonElement) {
+      console.log("startButton none");
       startButton.style.display = 'none';
     }
+
+    const turnText = document.querySelector('.turn-text');
+    if (turnText instanceof HTMLSpanElement) {
+      console.log("turnText none");
+      turnText.style.display = 'block';
+    }
+
     isPlaying = true;
   }
 
@@ -83,6 +129,7 @@ export default function Board() {
     player2Count = 0;
     isGameEnd = false;
 
+    console.log("[InitGameState Start]")
     console.log("isPlaying: " + isPlaying);
     console.log("Zones: " + zones);
     console.log("turn: " + turn);
@@ -91,10 +138,11 @@ export default function Board() {
     console.log("player2Zones: " + player2Zones);
     console.log("player2Count: " + player2Count);
     console.log("isGameEnd: " + isGameEnd);
+    console.log("[InitGameState End]")
   }
 
   function SelectZone(index: number) {
-    if (isPlaying === false || zones[index] || isGameEnd) return;
+    if (isPlaying === false || zones[index] || isGameEnd || index === -1) return;
     const nextZones = zones.slice(); // copy
     nextZones[index] = turn % 2 === 0 ? "●" : "○";
     setZones(nextZones);
@@ -239,6 +287,7 @@ export default function Board() {
     if (winner !== 0) {
       const startButton = document.querySelector('.start-button');
       if (startButton instanceof HTMLButtonElement) {
+        console.log("startButton none");
         startButton.style.display = 'none';
       }
       isGameEnd = true;
@@ -253,44 +302,40 @@ export default function Board() {
     }
   }
 
-
-  // [Make UI part]
-  function StartButton() {
-    if (isPlaying) return <></>;
-
-    return (
-      <button className='start-button' onClick={StartGame}>
-        Start Game
-      </button>
-    );
-  }
-
-  function ResetButton() {
-    return <button className='reset-button' onClick={() => { if (isPlaying) InitGameState(); }}>Reset Game</button>;
-  }
-
+  // [main loop]
   return (
-    <div className='board-ground'>
-      <StartButton></StartButton>
-      <ResetButton></ResetButton>
-      <MakeRowZones offset={0}></MakeRowZones>
-      <MakeRowZones offset={1}></MakeRowZones>
-      <MakeRowZones offset={2}></MakeRowZones>
-      <MakeRowZones offset={3}></MakeRowZones>
-      <MakeRowZones offset={4}></MakeRowZones>
-      <MakeRowZones offset={5}></MakeRowZones>
-      <MakeRowZones offset={6}></MakeRowZones>
-      <MakeRowZones offset={7}></MakeRowZones>
-      <MakeRowZones offset={8}></MakeRowZones>
-      <MakeRowZones offset={9}></MakeRowZones>
-      <MakeRowZones offset={10}></MakeRowZones>
-      <MakeRowZones offset={11}></MakeRowZones>
-      <MakeRowZones offset={12}></MakeRowZones>
-      <MakeRowZones offset={13}></MakeRowZones>
-      <MakeRowZones offset={14}></MakeRowZones>
-      <MakeRowZones offset={15}></MakeRowZones>
-      <MakeRowZones offset={16}></MakeRowZones>
-      <MakeRowZones offset={17}></MakeRowZones>
-    </div>
+    <>
+      <div className='ui-ground'>
+        <MakeTurnText></MakeTurnText>
+        <StartButton></StartButton>
+        <ResetButton></ResetButton>
+      </div>
+
+      <div className='board-ground'>
+        <MakeRowZones offset={0}></MakeRowZones>
+        <MakeRowZones offset={1}></MakeRowZones>
+        <MakeRowZones offset={2}></MakeRowZones>
+        <MakeRowZones offset={3}></MakeRowZones>
+        <MakeRowZones offset={4}></MakeRowZones>
+        <MakeRowZones offset={5}></MakeRowZones>
+        <MakeRowZones offset={6}></MakeRowZones>
+        <MakeRowZones offset={7}></MakeRowZones>
+        <MakeRowZones offset={8}></MakeRowZones>
+        <MakeRowZones offset={9}></MakeRowZones>
+        <MakeRowZones offset={10}></MakeRowZones>
+        <MakeRowZones offset={11}></MakeRowZones>
+        <MakeRowZones offset={12}></MakeRowZones>
+        <MakeRowZones offset={13}></MakeRowZones>
+        <MakeRowZones offset={14}></MakeRowZones>
+        <MakeRowZones offset={15}></MakeRowZones>
+        <MakeRowZones offset={16}></MakeRowZones>
+        <MakeRowZones offset={17}></MakeRowZones>
+      </div>
+
+      <div className='chat-ground'>
+        <MakeChatWindow></MakeChatWindow>
+        <MakeChatInput></MakeChatInput>
+      </div>
+    </>
   );
 }

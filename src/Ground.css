@@ -2,7 +2,10 @@ button {
   padding: 0;
 }
 
+
+/* [Board part css] */
 .board-ground {
+  margin-top: 18px;
   margin-left: 14%;
 }
 
@@ -17,6 +20,13 @@ button {
   border: 1px solid black;
   font-size: 18pt;
   background-color: goldenrod;
+}
+
+
+/* [UI part css] */
+.ui-ground {
+  margin-top: 18px;
+  margin-left: 14%;
 }
 
 .start-button {
@@ -35,4 +45,38 @@ button {
   position: absolute;
   margin-top: 340px;
   margin-left: 740px;
+}
+
+.turn-text {
+  position: absolute;
+  margin-left: -12%;
+  margin-top: 338px;
+  font-size: 20pt;
+  font-weight: 700;
+}
+
+
+/* [Chat part css] */
+.chat-ground {
+  margin-left: 5%;
+}
+
+.chats-div {
+  width: 80%;
+  height: 250px;
+  border: 3px solid black;
+  margin: 20px;
+  font-size: 12pt;
+}
+
+.chat-input {
+  width: 60%;
+  height: 38px;
+  border: 2px solid black;
+  font-size: 18pt;
+}
+
+.nickname {
+  font-weight: 600;
+  font-size: 15pt;
 }
