@@ -1,0 +1,43 @@
+.login-div {
+    position: absolute;
+    left: 25%;
+    top: 30%;
+    width: 50%;
+    height: 290px;
+    border: 1px solid black;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.sign-link-div {
+    position: relative;
+    width: 101px;
+    left: 75%;
+    top: -5%;
+}
+
+.sign-link {
+    text-align: right;
+}
+
+.login-title {
+    position: relative;
+    top: -10%;
+    margin: 0;
+    padding: 0;
+}
+
+.login-id,
+.login-pwd {
+    width: 50%;
+    height: 30px;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+.login-botton {
+    width: 30%;
+    height: 30px;
+    margin: 20px;
+    padding: 0;
+}

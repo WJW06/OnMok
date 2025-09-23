@@ -1,0 +1,48 @@
+.sign-div {
+    text-align: center;
+    position: absolute;
+    left: 25%;
+    top: 30%;
+    width: 50%;
+    height: 350px;
+    border: 1px solid black;
+    border-radius: 10px;
+}
+
+.login-link-div {
+    position: relative;
+    width: 110px;
+    left: 2%;
+    top: -4%;
+}
+
+.login-link {
+    text-align: left;
+}
+
+.sign-title {
+    position: relative;
+    top: -8%;
+    margin: 0;
+    padding: 0;
+}
+
+.sign-title {
+    margin: 5px;
+}
+
+.sign-id,
+.sign-pwd,
+.sign-verify-pwd {
+    width: 50%;
+    height: 30px;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+.sign-botton {
+    width: 30%;
+    height: 30px;
+    margin: 20px;
+    padding: 0;
+}

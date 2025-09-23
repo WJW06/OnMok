@@ -1,22 +1,21 @@
-import './Ground.css';
-import './Ground-responsive.css';
-import { useState } from 'react';
+import '../style/Ground.css';
+import '../style/Ground-responsive.css';
+import { useRef, useState } from 'react';
 
 // [Game setting (*Don't touch*)]
 const rcCount: number = 18;
 
-// [Game-state variables]
-let isPlaying: boolean = false;
-let turn: number = 0;
-let selectZone: number = -1;
-let player1Zones: boolean[] = Array<boolean>(rcCount * rcCount).fill(false);
-let player1Count: number = 0;
-let player2Zones: boolean[] = Array<boolean>(rcCount * rcCount).fill(false);
-let player2Count: number = 0;
-let isGameEnd: boolean = false;
-
 export default function Board() {
+  // [Game-state variables]
   const [zones, setZones] = useState<string[]>(Array<string>(rcCount * rcCount).fill(""));
+  let isPlaying = useRef(false);
+  let turn = useRef(0);
+  let selectZone = useRef(-1);
+  let player1Zones = useRef(Array<boolean>(rcCount * rcCount).fill(false));
+  let player1Count = useRef(0);
+  let player2Zones = useRef(Array<boolean>(rcCount * rcCount).fill(false));
+  let player2Count = useRef(0);
+  let isGameEnd = useRef(false);
 
   // [Make UI part]
   type MakeRowProps = {
@@ -61,7 +60,7 @@ export default function Board() {
 
   // {UI part}
   function StartButton() {
-    if (isPlaying) return <></>;
+    if (isPlaying.current) return <></>;
 
     return (
       <button className='start-button' onClick={StartGame}>
@@ -71,13 +70,13 @@ export default function Board() {
   }
 
   function ResetButton() {
-    return <button className='reset-button' onClick={() => { if (isPlaying) InitGameState(); }}>Reset Game</button>;
+    return <button className='reset-button' onClick={() => { if (isPlaying.current) InitGameState(); }}>Reset Game</button>;
   }
 
   function MakeTurnText() {
-    console.log(isPlaying);
-    if (isPlaying) return <span className='turn-text' style={{ display: 'block' }}>turn: {turn + 1}</span>
-    else return <span className='turn-text' style={{ display: 'none' }}>turn: {turn + 1}</span>
+    console.log(isPlaying.current);
+    if (isPlaying.current) return <span className='turn-text' style={{ display: 'block' }}>turn: {turn.current + 1}</span>
+    else return <span className='turn-text' style={{ display: 'none' }}>turn: {turn.current + 1}</span>
   }
 
   // {Chat part}
@@ -112,22 +111,22 @@ export default function Board() {
       turnText.style.display = 'block';
     }
 
-    isPlaying = true;
+    isPlaying.current = true;
   }
 
   function InitGameState() {
     const resetZones = zones.slice();
     for (let i = 0; i < rcCount * rcCount; ++i) {
       resetZones[i] = "";
-      player1Zones[i] = false;
-      player2Zones[i] = false;
+      player1Zones.current[i] = false;
+      player2Zones.current[i] = false;
     }
     setZones(resetZones);
-    turn = 0;
-    isPlaying = false;
-    player1Count = 0;
-    player2Count = 0;
-    isGameEnd = false;
+    turn.current = 0;
+    isPlaying.current = false;
+    player1Count.current = 0;
+    player2Count.current = 0;
+    isGameEnd.current = false;
 
     console.log("[InitGameState Start]")
     console.log("isPlaying: " + isPlaying);
@@ -142,27 +141,27 @@ export default function Board() {
   }
 
   function SelectZone(index: number) {
-    if (isPlaying === false || zones[index] || isGameEnd || index === -1) return;
+    if (isPlaying.current === false || zones[index] || isGameEnd.current || index === -1) return;
     const nextZones = zones.slice(); // copy
-    nextZones[index] = turn % 2 === 0 ? "●" : "○";
+    nextZones[index] = turn.current % 2 === 0 ? "●" : "○";
     setZones(nextZones);
-    selectZone = index;
+    selectZone.current = index;
 
-    if (turn % 2 === 0) {
-      player1Zones[index] = true;
-      if (++player1Count > 4) CheckWinner();
+    if (turn.current % 2 === 0) {
+      player1Zones.current[index] = true;
+      if (++player1Count.current > 4) CheckWinner();
     }
     else {
-      player2Zones[index] = true;
-      if (++player2Count > 4) CheckWinner();
+      player2Zones.current[index] = true;
+      if (++player2Count.current > 4) CheckWinner();
     }
-    ++turn;
+    ++turn.current;
 
-    console.log("SelectZone: " + selectZone);
+    console.log("SelectZone: " + selectZone.current);
   }
 
   function FirstWinCase(curPlayer: boolean[]) {
-    let curZone: number = selectZone;
+    let curZone: number = selectZone.current;
     let zoneCount: number = 1;
 
     // Move left
@@ -189,7 +188,7 @@ export default function Board() {
   }
 
   function SecondWinCase(curPlayer: boolean[]) {
-    let curZone: number = selectZone;
+    let curZone: number = selectZone.current;
     let zoneCount: number = 1;
 
     // Move top
@@ -216,7 +215,7 @@ export default function Board() {
   }
 
   function ThirdWinCase(curPlayer: boolean[]) {
-    let curZone: number = selectZone;
+    let curZone: number = selectZone.current;
     let zoneCount: number = 1;
 
     // Move left-top
@@ -243,7 +242,7 @@ export default function Board() {
   }
 
   function FourthWinCase(curPlayer: boolean[]) {
-    let curZone: number = selectZone;
+    let curZone: number = selectZone.current;
     let zoneCount: number = 1;
 
     // Move left-bottom
@@ -270,11 +269,11 @@ export default function Board() {
   }
 
   function CheckLine() {
-    let curPlayer: boolean[] = turn % 2 === 0 ? player1Zones : player2Zones;
+    let curPlayer: boolean[] = turn.current % 2 === 0 ? player1Zones.current : player2Zones.current;
 
     if (FirstWinCase(curPlayer) || SecondWinCase(curPlayer)
       || ThirdWinCase(curPlayer) || FourthWinCase(curPlayer)) {
-      if (turn % 2 === 0) return 1;
+      if (turn.current % 2 === 0) return 1;
       else return 2;
     }
     else return 0;
@@ -290,7 +289,7 @@ export default function Board() {
         console.log("startButton none");
         startButton.style.display = 'none';
       }
-      isGameEnd = true;
+      isGameEnd.current = true;
 
       if (winner === 1) {
         alert("Winner: Player1!");
