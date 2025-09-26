@@ -10,10 +10,12 @@
 }
 
 .sign-link-div {
-    position: relative;
+    position: absolute;
     width: 101px;
-    left: 75%;
+    /* left: 75%; */
+    right: 0%;
     top: -5%;
+    text-align: right;
 }
 
 .sign-link {
@@ -22,21 +24,25 @@
 
 .login-title {
     position: relative;
-    top: -10%;
+    top: 10%;
     margin: 0;
     padding: 0;
 }
 
 .login-id,
 .login-pwd {
+    position: relative;
     width: 50%;
+    top: 20%;
     height: 30px;
     border-radius: 10px;
     margin-top: 20px;
 }
 
 .login-botton {
+    position: relative;
     width: 30%;
+    top: 20%;
     height: 30px;
     margin: 20px;
     padding: 0;
