@@ -1,11 +1,17 @@
 import '../style/Ground.css';
 import '../style/Ground-responsive.css';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // [Game setting (*Don't touch*)]
 const rcCount: number = 18;
 
 export default function Board() {
+  useEffect(() => {
+    fetch("https://localhost:5000/Ground")
+    .then((res) => res.json())
+  });
+
+
   // [Game-state variables]
   const [zones, setZones] = useState<string[]>(Array<string>(rcCount * rcCount).fill(""));
   let isPlaying = useRef(false);
