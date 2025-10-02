@@ -1,6 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import Login from './components/Login';
-import Sign from './components/Sign';
+import Sign from './components/Sign_up';
 import Ground from './components/Ground';
 
 export default function Router() {

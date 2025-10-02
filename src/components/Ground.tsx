@@ -7,8 +7,9 @@ const rcCount: number = 18;
 
 export default function Board() {
   useEffect(() => {
-    fetch("https://localhost:5000/Ground")
-    .then((res) => res.json())
+    fetch("http://localhost:5000/Ground")
+      .then((res) => res.json())
+      .then((data) => { console.log(data) })
   });
 
 
