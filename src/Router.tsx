@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
-import Login from './components/Login';
-import Sign from './components/Sign_up';
+import Login from './pages/Login';
+import Sign from './pages/Sign_up';
+import Home from './pages/Home';
 import Ground from './components/Ground';
 
 export default function Router() {
@@ -8,7 +9,8 @@ export default function Router() {
         <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/Login" element={<Login />} />
-            <Route path="/Sign" element={<Sign />} />
+            <Route path="/Sign_up" element={<Sign />} />
+            <Route path="/Home" element={<Home />} />
             <Route path="/Ground" element={<Ground />} />
         </Routes>
     );

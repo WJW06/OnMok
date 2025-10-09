@@ -1,0 +1,85 @@
+.home-container {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f4f4f4;
+  font-family: sans-serif;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 20%;
+  background: white;
+  border-right: 1px solid #ddd;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.profile-box {
+  width: 100%;
+  border: 1px solid #ddd;
+  padding: 10px;
+  border-radius: 8px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.profile-box .avatar {
+  width: 40px;
+  height: 40px;
+  background: #ccc;
+  border-radius: 50%;
+  margin: 0 auto 10px;
+}
+
+.sidebar button {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+  border: none;
+  background: #e5e5e5;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.sidebar button:hover {
+  background: #d1d1d1;
+}
+
+.theme-icon {
+  margin-top: auto;
+  font-size: 24px;
+}
+
+/* Main Area */
+.main-area {
+  flex: 1;
+  padding: 20px;
+}
+
+.room-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.refresh-btn {
+  border: none;
+  background: #e5e5e5;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.refresh-btn:hover {
+  background: #d1d1d1;
+}
+
+.room-list {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

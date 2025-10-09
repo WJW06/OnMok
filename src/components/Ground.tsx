@@ -1,5 +1,5 @@
-import '../style/Ground.css';
-import '../style/Ground-responsive.css';
+import '../styles/Ground.css';
+import '../styles/Ground-responsive.css';
 import { useEffect, useRef, useState } from 'react';
 
 // [Game setting (*Don't touch*)]

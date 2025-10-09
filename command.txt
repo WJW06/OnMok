@@ -1,0 +1,29 @@
+create user "Test_user" with password '1234';
+alter user "Test_user" with superuser;
+create database "Test_db" owner "Test_user";
+(sql 나갔다가 다시 들어오기, "Test_user"로 접속)
+\c "Test_db"
+alter user "Test_user" with login;
+grant all privileges on database "Test_db" to "Test_user";
+
+create table "User"(
+u_id varchar(20) primary key,
+u_pwd varchar(30),
+u_win integer,
+u_lose integer,
+u_draw integer
+);
+
+
+pgAdmin 실행 후 Servers 우클 -> Register(등록): Server -> Name은 아무렇게나 -> 밑에 설정대로
+Host name/address: 127.0.0.1
+Port: 5432(다른 서버랑 겹치면 안됌)
+MDB: Test_db
+UN: Test_user
+PW: 1234
+Save password: 체크
+
+
+npm install express cors pg
+npm install concurrently --save-dev
+npm run dev

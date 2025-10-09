@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import '../style/Login.css'
+import '../styles/Login.css'
 import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
@@ -12,7 +12,7 @@ export default function Login() {
     const navigate = useNavigate();
 
     function GoToSignPage() {
-        navigate('/Sign');
+        navigate('/Sign_up');
     }
 
     const [u_id, setU_id] = useState("");
@@ -29,8 +29,9 @@ export default function Login() {
 
         const data = await res.json();
         console.log(data);
+        
         if (data.success) {
-            navigate('/Ground');
+            navigate('/Home');
         }
         else {
             alert(data.message);

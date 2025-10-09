@@ -11,7 +11,7 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  port: 5433,
+  port: 5432,
 });
 
 client.connect();
@@ -57,10 +57,30 @@ app.get("/Ground", async (req, res) => {
   }
 });
 
-app.post("/Login", (req, res) => {
+app.post("/Login", async (req, res) => {
   const { u_id, u_pwd } = req.body;
-  console.log("u_id: ", u_id, " u_pwd: ", u_pwd);
-  res.json({ success: true, message: "Success Login!" });
+
+  try{
+    const query = `select * from "User" where u_id = $1`;
+    const result = await client.query(query, [u_id]);
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ success: false, message: "This ID does not exist." });
+    }
+
+    const user = result.rows[0];
+
+    if (user.u_pwd !== u_pwd) {
+      return res.status(401).json({ success: false, message: "The password is different." });
+    }
+
+    console.log(`${u_id} logged in successfully`);
+    res.json({ success: true, message: "Success Login!" });
+
+  } catch (err) {
+    console.error("Login DB Error: ", err);
+    res.status(500).json({ success: false, message: "DB Error" });
+  }
 });
 
 app.post("/Sign_up", async (req, res) => {
@@ -72,14 +92,15 @@ app.post("/Sign_up", async (req, res) => {
     const result = await client.query(query, values);
 
     console.log("Inserted user: ", result.rows[0]);
-    res.json({ success: true, message: "Success Sign up!", user: result.rows[0] });
-  } catch (err) {
-    console.error(err);
+    res.json({ success: true, message: "Success sign up!", user: result.rows[0] });
 
+  } catch (err) {
     if (err.code === "23505") {
-      res.json({ success: false, message: "ID already exists" });
+      res.json({ success: false, message: "This ID already exists." });
     } else {
       res.status(500).json({ success: false, message: "DB Error" });
     }
+
+    console.error("Sign DB Error: ", err);
   }
 });

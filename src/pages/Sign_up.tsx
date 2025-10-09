@@ -22,7 +22,7 @@ export default function Login() {
 
     const Sign_Up = async () => {
         if (u_pwd !== u_verify_pwd) {
-            console.log("Not equal pwd.");
+            alert("Not equal pwd.");
             return;
         }
 
@@ -36,6 +36,7 @@ export default function Login() {
 
         const data = await res.json();
         console.log(data);
+        
         if (data.success) {
             navigate('/Login');
         }
