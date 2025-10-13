@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import '../style/Sign_up.css'
+import '../styles/Sign_up.css'
 import { useNavigate } from 'react-router-dom';
-// import MainPage from './Ground'
 
-export default function Login() {
+const Sign_up: React.FC = () => {
     useEffect(() => {
         fetch("http://localhost:5000/Sign_up")
             .then((res) => res.json())
@@ -17,12 +16,12 @@ export default function Login() {
     }
 
     const [u_id, setU_id] = useState("");
-    const [u_pwd, setU_pwd] = useState("");
-    const [u_verify_pwd, setU_verify_pwd] = useState("");
+    const [u_password, setU_password] = useState("");
+    const [u_verify_password, setU_verify_password] = useState("");
 
     const Sign_Up = async () => {
-        if (u_pwd !== u_verify_pwd) {
-            alert("Not equal pwd.");
+        if (u_password !== u_verify_password) {
+            alert("Not equal password.");
             return;
         }
 
@@ -31,13 +30,14 @@ export default function Login() {
             headers: {
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ u_id, u_pwd }),
+            body: JSON.stringify({ u_id, u_password }),
         });
 
         const data = await res.json();
         console.log(data);
-        
+
         if (data.success) {
+            alert(data.message);
             navigate('/Login');
         }
         else {
@@ -53,11 +53,13 @@ export default function Login() {
             <h1 className='sign-title'>Sign up</h1>
             <input type='text' placeholder='Input Id' className='sign-id'
                 onChange={(e) => { setU_id(e.target.value) }} /><br />
-            <input type='password' placeholder='Input password' className='sign-pwd'
-                onChange={(e) => { setU_pwd(e.target.value) }} /><br />
-            <input type='password' placeholder='Input verify password' className='sign-verify-pwd'
-                onChange={(e) => { setU_verify_pwd(e.target.value) }} /><br />
+            <input type='password' placeholder='Input password' className='sign-password'
+                onChange={(e) => { setU_password(e.target.value) }} /><br />
+            <input type='password' placeholder='Input verify password' className='sign-verify-password'
+                onChange={(e) => { setU_verify_password(e.target.value) }} /><br />
             <button className='sign-botton' onClick={Sign_Up}>Sign up</button>
         </div>
     );
 }
+
+export default Sign_up;

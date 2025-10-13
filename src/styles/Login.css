@@ -30,7 +30,7 @@
 }
 
 .login-id,
-.login-pwd {
+.login-password {
     position: relative;
     width: 50%;
     top: 20%;

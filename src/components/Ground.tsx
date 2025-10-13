@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 // [Game setting (*Don't touch*)]
 const rcCount: number = 18;
 
-export default function Board() {
+const Board: React.FC = () => {
   useEffect(() => {
     fetch("http://localhost:5000/Ground")
       .then((res) => res.json())
@@ -345,3 +345,5 @@ export default function Board() {
     </>
   );
 }
+
+export default Board;

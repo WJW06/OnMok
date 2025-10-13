@@ -11,7 +11,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  port: 5432,
+  // port: 5432, /* 집 */
+  port: 5433, /* 회사 */
 });
 
 client.connect();
@@ -58,9 +59,9 @@ app.get("/Ground", async (req, res) => {
 });
 
 app.post("/Login", async (req, res) => {
-  const { u_id, u_pwd } = req.body;
+  const { u_id, u_password } = req.body;
 
-  try{
+  try {
     const query = `select * from "User" where u_id = $1`;
     const result = await client.query(query, [u_id]);
 
@@ -70,7 +71,7 @@ app.post("/Login", async (req, res) => {
 
     const user = result.rows[0];
 
-    if (user.u_pwd !== u_pwd) {
+    if (user.u_password !== u_password) {
       return res.status(401).json({ success: false, message: "The password is different." });
     }
 
@@ -84,11 +85,11 @@ app.post("/Login", async (req, res) => {
 });
 
 app.post("/Sign_up", async (req, res) => {
-  const { u_id, u_pwd } = req.body;
+  const { u_id, u_password } = req.body;
 
   try {
-    const query = `insert into "User"(u_id, u_pwd) values($1, $2) returning *`;
-    const values = [u_id, u_pwd];
+    const query = `insert into "User"(u_id, u_password) values($1, $2) returning *`;
+    const values = [u_id, u_password];
     const result = await client.query(query, values);
 
     console.log("Inserted user: ", result.rows[0]);

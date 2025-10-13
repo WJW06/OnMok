@@ -6,18 +6,17 @@ import "../styles/Home.css";
 
 const Home: React.FC = () => {
   useEffect(() => {
-      fetch("http://localhost:5000/Home")
-        .then((res) => res.json())
-        .then((data) => { console.log(data) })
-    });
+    fetch("http://localhost:5000/Home")
+      .then((res) => res.json())
+      .then((data) => { console.log(data) })
+  });
 
   const [rooms, setRooms] = useState<Room[]>([
     {
-      id: 1,
-      title: "Room 1",
-      setting: "Normal Mode",
+      name: "Room 1",
       players: 1,
       maxPlayers: 8,
+      setting: "Normal Mode",
       isLocked: true,
       password: "1234",
     },
@@ -29,8 +28,7 @@ const Home: React.FC = () => {
 
   const addRoom = () => {
     const newRoom: Room = {
-      id: Date.now(),
-      title: `Room ${rooms.length + 1}`,
+      name: `Room ${rooms.length + 1}`,
       setting: "Default Setting",
       players: Math.floor(Math.random() * 8),
       maxPlayers: 8,
@@ -45,13 +43,13 @@ const Home: React.FC = () => {
       setSelectedRoom(room);
       setShowPasswordModal(true);
     } else {
-      alert(`${room.title} Enter success!`);
+      alert(`${room.name} Enter success!`);
     }
   };
 
   const handlePasswordSubmit = (enteredPassword: string) => {
     if (selectedRoom && enteredPassword === selectedRoom.password) {
-      alert(`${selectedRoom.title} Enter success!`);
+      alert(`${selectedRoom.name} Enter success!`);
       setShowPasswordModal(false);
     } else {
       alert("Wrong Password");
@@ -86,7 +84,7 @@ const Home: React.FC = () => {
 
         <div className="room-list">
           {rooms.map((room) => (
-            <RoomBox key={room.id} {...room} onClick={() => handleRoomClick(room)} />
+            <RoomBox key={room.name} {...room} onClick={() => handleRoomClick(room)} />
           ))}
         </div>
       </div>

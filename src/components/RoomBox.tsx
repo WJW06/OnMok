@@ -2,11 +2,10 @@ import React from "react";
 import "../styles/RoomBox.css";
 
 export interface Room {
-  id: number;
-  title: string;
-  setting: string;
+  name: string;
   players: number;
   maxPlayers: number;
+  setting: string;
   isLocked: boolean;
   password?: string;
 }
@@ -16,10 +15,10 @@ interface RoomBoxProps extends Room {
 }
 
 const RoomBox: React.FC<RoomBoxProps> = ({
-  title,
-  setting,
+  name,
   players,
   maxPlayers,
+  setting,
   isLocked,
   onClick,
 }) => {
@@ -28,7 +27,7 @@ const RoomBox: React.FC<RoomBoxProps> = ({
       <div className="room-info">
         <div className="avatar" />
         <div className="room-text">
-          <p className="room-title">{title}</p>
+          <p className="room-name">{name}</p>
           <p className="room-setting">{setting}</p>
         </div>
       </div>
