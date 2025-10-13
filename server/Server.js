@@ -1,6 +1,9 @@
 const express = require("express");
 const { Client } = require("pg");
 const cors = require("cors");
+const { v4: uuidv4 } = require("uuid");
+const http = require("http");
+const { Server } = require("socket.io");
 
 const app = express();
 app.use(cors());
@@ -11,8 +14,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  // port: 5432, /* 집 */
-  port: 5433, /* 회사 */
+  port: 5432, /* 집 */
+  // port: 5433, /* 회사 */
 });
 
 client.connect();
@@ -104,4 +107,42 @@ app.post("/Sign_up", async (req, res) => {
 
     console.error("Sign DB Error: ", err);
   }
+});
+
+const rooms = new Map();
+
+app.post("/SelectRoom", (req, res) => {
+  const { u_id } = req.body;
+  const r_id = uuidv4().slice(0, 8); // Random ID (8 length)
+
+  rooms.set(r_id, { users: [u_id], state: {} });
+  console.log(`Created room: ${r_id} (by ${u_id})`);
+
+  res.json({ success: true, r_id });
+});
+
+/* Socket.io */
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
+  },
+});
+
+io.on("connection", (socket) => {
+  console.log("Connect client:", socket.id);
+
+  socket.on("joinRoom", ({ r_id, user }) => {
+    socket.join(r_id);
+    console.log(`${user} joined room ${r_id}`);
+    io.to(r_id).emit("roomUpdate", { message: `${user} joined room ${r_id}` });
+  });
+
+  socket.on("leaveRoom", ({ r_id, user }) => {
+    socket.leave(r_id);
+    console.log(`${user} left room ${r_id}`);
+    io.to(r_id).emit("roomUpdate", { message: `${user} left room ${r_id}` });
+  });
 });

@@ -2,12 +2,13 @@ import React from "react";
 import "../styles/RoomBox.css";
 
 export interface Room {
-  name: string;
-  players: number;
-  maxPlayers: number;
-  setting: string;
-  isLocked: boolean;
-  password?: string;
+  r_id: number;
+  r_name: string;
+  r_players: number;
+  r_maxPlayers: number;
+  r_setting: string;
+  r_isLocked: boolean;
+  r_password?: string;
 }
 
 interface RoomBoxProps extends Room {
@@ -15,11 +16,11 @@ interface RoomBoxProps extends Room {
 }
 
 const RoomBox: React.FC<RoomBoxProps> = ({
-  name,
-  players,
-  maxPlayers,
-  setting,
-  isLocked,
+  r_name,
+  r_players,
+  r_maxPlayers,
+  r_setting,
+  r_isLocked,
   onClick,
 }) => {
   return (
@@ -27,13 +28,13 @@ const RoomBox: React.FC<RoomBoxProps> = ({
       <div className="room-info">
         <div className="avatar" />
         <div className="room-text">
-          <p className="room-name">{name}</p>
-          <p className="room-setting">{setting}</p>
+          <p className="room-name">{r_name}</p>
+          <p className="room-setting">{r_setting}</p>
         </div>
       </div>
       <div className="room-status">
-        <span>{players}/{maxPlayers}</span>
-        {isLocked && <span className="lock-icon">🔒</span>}
+        <span>{r_players}/{r_maxPlayers}</span>
+        {r_isLocked && <span className="lock-icon">🔒</span>}
       </div>
     </div>
   );

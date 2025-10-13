@@ -9,16 +9,15 @@ const Sign_up: React.FC = () => {
             .then((data) => { console.log(data) })
     });
 
+    const [u_id, setU_id] = useState("");
+    const [u_password, setU_password] = useState("");
+    const [u_verify_password, setU_verify_password] = useState("");
     const navigate = useNavigate();
 
     function GoToLoginPage() {
         navigate('/Login');
     }
-
-    const [u_id, setU_id] = useState("");
-    const [u_password, setU_password] = useState("");
-    const [u_verify_password, setU_verify_password] = useState("");
-
+    
     const Sign_Up = async () => {
         if (u_password !== u_verify_password) {
             alert("Not equal password.");

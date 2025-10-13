@@ -28,8 +28,8 @@ const PasswordModal: React.FC<PasswordModalProps> = ({ onClose, onSubmit }) => {
             required
           />
           <div className="modal-buttons">
-            <button type="submit">Enter</button>
             <button type="button" onClick={onClose}>Cancel</button>
+            <button type="submit">Enter</button>
           </div>
         </form>
       </div>

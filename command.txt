@@ -2,7 +2,12 @@ create user "Test_user" with password '1234';
 alter user "Test_user" with superuser;
 create database "Test_db" owner "Test_user";
 (sql 나갔다가 다시 들어오기, "Test_user"로 접속)
-\c "Test_db"
+
+
+"Test_db"
+
+"Test_user"
+
 alter user "Test_user" with login;
 grant all privileges on database "Test_db" to "Test_user";
 
@@ -21,7 +26,7 @@ r_name varchar(40) primary key,
 r_players integer,
 r_maxPlayer integer,
 r_setting varchar(100),
-r_locked boolean,
+r_isLocked boolean,
 r_password varchar(30),
 r_player1 varchar(20) forgin,
 r_player2 varchar(20) forgin,
@@ -46,4 +51,6 @@ Save password: 체크
 
 npm install express cors pg
 npm install concurrently --save-dev
+npm install socket.io
+npm install socket.io-client
 npm run dev

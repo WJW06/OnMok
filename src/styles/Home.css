@@ -18,19 +18,96 @@
 
 .profile-box {
   width: 100%;
-  border: 1px solid #ddd;
   padding: 10px;
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
   border-radius: 8px;
   text-align: center;
-  margin-bottom: 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
-.profile-box .avatar {
-  width: 40px;
-  height: 40px;
-  background: #ccc;
+.avatar {
+  width: 60px;
+  height: 60px;
+  background-color: #dcdcdc;
   border-radius: 50%;
   margin: 0 auto 10px;
+}
+
+.nickname {
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
+.stats-box {
+  background-color: #f5f5f5;
+  border-radius: 15px;
+  padding: 10px 0;
+  margin-bottom: 15px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 5px 15px;
+}
+
+.stat-item .circle {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #000;
+  border-radius: 50%;
+}
+
+.stat-item span {
+  font-size: 14px;
+}
+
+.level-box {
+  text-align: left;
+  padding: 10px 15px;
+}
+
+.level-text {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 5px;
+  display: block;
+}
+
+.level-bar {
+  position: relative;
+  width: 100%;
+  height: 30px;
+  border: 2px solid #000;
+  border-radius: 20px;
+  display: flex;
+  overflow: hidden;
+  align-items: center;
+  justify-content: start;
+  background-color: #ffffff;
+}
+
+.level-fill {
+  background-color: #34b94a;
+  height: 100%;
+  width: 0;
+  border-radius: 20px 0 0 20px;
+  display: flex;
+  color: #000;
+  font-weight: bold;
+  transition: width 0.5s ease;
+}
+
+.level-percent {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  color: #000;
+  font-weight: bold;
+  font-size: 14px;
 }
 
 .sidebar button {

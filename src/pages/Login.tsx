@@ -9,14 +9,13 @@ const Login: React.FC = () => {
             .then((data) => { console.log(data) })
     });
 
+    const [u_id, setU_id] = useState("");
+    const [u_password, setU_password] = useState("");
     const navigate = useNavigate();
 
     function GoToSignPage() {
         navigate('/Sign_up');
     }
-
-    const [u_id, setU_id] = useState("");
-    const [u_password, setU_password] = useState("");
 
     const Login = async () => {
         const res = await fetch("http://localhost:5000/Login", {
@@ -31,7 +30,7 @@ const Login: React.FC = () => {
         console.log(data);
 
         if (data.success) {
-            navigate('/Home');
+            navigate('/Home', {state: u_id});
         }
         else {
             alert(data.message);
