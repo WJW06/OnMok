@@ -4,6 +4,15 @@ const cors = require("cors");
 const { v4: uuidv4 } = require("uuid");
 const http = require("http");
 const { Server } = require("socket.io");
+const jwt = require("jsonwebtoken");
+
+require('dotenv').config();
+const SECRET_KEY = process.env.SECRET_KEY;
+if (!SECRET_KEY) {
+  console.error("ERROR: SECRET_KEY is not set. Set it in .env or environment variables.");
+  process.exit(1);
+}
+
 
 const app = express();
 app.use(cors());
@@ -14,8 +23,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  port: 5432, /* 집 */
-  // port: 5433, /* 회사 */
+  // port: 5432, /* 집 */
+  port: 5433, /* 회사 */
 });
 
 client.connect();
@@ -78,8 +87,14 @@ app.post("/Login", async (req, res) => {
       return res.status(401).json({ success: false, message: "The password is different." });
     }
 
+    const token = jwt.sign(
+      { u_name: user.u_name, r_name: null },
+      SECRET_KEY,
+      { expiresIn: "30min" }
+    );
+
     console.log(`${u_id} logged in successfully`);
-    res.json({ success: true, message: "Success Login!" });
+    res.json({ success: true, token, message: "Success Login!" });
 
   } catch (err) {
     console.error("Login DB Error: ", err);
@@ -88,11 +103,11 @@ app.post("/Login", async (req, res) => {
 });
 
 app.post("/Sign_up", async (req, res) => {
-  const { u_id, u_password } = req.body;
+  const { u_id, u_password, u_name } = req.body;
 
   try {
-    const query = `insert into "User"(u_id, u_password) values($1, $2) returning *`;
-    const values = [u_id, u_password];
+    const query = `insert into "User"(u_id, u_password, u_name) values($1, $2, $3) returning *`;
+    const values = [u_id, u_password, u_name];
     const result = await client.query(query, values);
 
     console.log("Inserted user: ", result.rows[0]);
@@ -109,16 +124,50 @@ app.post("/Sign_up", async (req, res) => {
   }
 });
 
+app.post("/me", (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ success: false, message: "No token provided" });
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    res.json({ success: true, user: decoded });
+  } catch (err) {
+    res.status(401).json({ success: false, message: "Invalid or expired token" });
+  }
+});
+
+
 const rooms = new Map();
 
-app.post("/SelectRoom", (req, res) => {
-  const { u_id } = req.body;
-  const r_id = uuidv4().slice(0, 8); // Random ID (8 length)
+app.post("/JoinRoom", (req, res) => {
+  const { r_id, token, r_name } = req.body;
 
-  rooms.set(r_id, { users: [u_id], state: {} });
-  console.log(`Created room: ${r_id} (by ${u_id})`);
+  if (!token) {
+    return res.status(400).json({ success: false, message: "No token provided" });
+  }
+  if (!r_id || !r_name) {
+    return res.status(400).json({ success: false, message: "No room provided" });
+  }
 
-  res.json({ success: true, r_id });
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+
+    console.log(`${decoded.u_name} joined room "${r_name}"`);
+    rooms.set(r_id, { r_name, users: [decoded.u_name], state: {} });
+
+    const { exp, iat, ...rest } = decoded;
+    const newToken = jwt.sign(
+      { ...rest, r_name },
+      SECRET_KEY,
+      { expiresIn: "30min" }
+    );
+    return res.json({ success: true, r_id, token: newToken });
+  } catch (err) {
+    console.error("JoinRoom Error:", err);
+    res.status(401).json({ success: false, message: "Invalid token" });
+  }
 });
 
 /* Socket.io */
@@ -132,17 +181,51 @@ const io = new Server(server, {
 });
 
 io.on("connection", (socket) => {
-  console.log("Connect client:", socket.id);
+  console.log("Connect client:", socket.id); // 문제
 
-  socket.on("joinRoom", ({ r_id, user }) => {
-    socket.join(r_id);
-    console.log(`${user} joined room ${r_id}`);
-    io.to(r_id).emit("roomUpdate", { message: `${user} joined room ${r_id}` });
+  socket.on("joinRoom", ({ r_id, token }) => {
+    console.log("🔥 joinRoom event received:", r_id, token); // 문제
+
+    try {
+      const decoded = jwt.verify(token, SECRET_KEY);
+      const { u_name, r_name } = decoded;
+
+      socket.join(r_id);
+      if (!rooms.has(r_id)) {
+        rooms.set(r_id, { users: [u_name], r_name });
+        console.log(`Created room: ${r_name} (${r_id}) by ${u_name}`);
+      } else {
+        const room = rooms.get(r_id);
+        if (!room.users.includes(u_name)) room.users.push(u_name);
+        console.log(`${u_name} joined room ${room.r_name} (${r_id})`);
+      }
+
+      const room = rooms.get(r_id);
+      io.to(r_id).emit("roomUpdate", { u_name, r_name, users: room.users });
+    } catch (err) {
+      console.error("Invalid token:", err);
+      socket.emit("authError", { message: "Invalid token" });
+    }
   });
 
-  socket.on("leaveRoom", ({ r_id, user }) => {
-    socket.leave(r_id);
-    console.log(`${user} left room ${r_id}`);
-    io.to(r_id).emit("roomUpdate", { message: `${user} left room ${r_id}` });
+  socket.on("leaveRoom", ({ r_id, u_name }) => {
+    try {
+      const decoded = jwt.verify(token, SECRET_KEY);
+      const { u_name } = decoded;
+
+      socket.leave(r_id);
+      const room = rooms.get(r_id);
+      if (room) {
+        room.users = room.users.filter((u) => u !== u_name);
+        io.to(r_id).emit("roomUpdate", { u_name, users: room.users });
+        console.log(`${u_name} left room ${r_id}`);
+      }
+    } catch (err) {
+      console.error("leaveRoom Error:", err);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Disconnected:", socket.id);
   });
 });

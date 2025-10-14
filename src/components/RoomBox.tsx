@@ -2,11 +2,11 @@ import React from "react";
 import "../styles/RoomBox.css";
 
 export interface Room {
-  r_id: number;
+  r_id: string;
   r_name: string;
   r_players: number;
   r_maxPlayers: number;
-  r_setting: string;
+  r_turnTime: string;
   r_isLocked: boolean;
   r_password?: string;
 }
@@ -19,7 +19,7 @@ const RoomBox: React.FC<RoomBoxProps> = ({
   r_name,
   r_players,
   r_maxPlayers,
-  r_setting,
+  r_turnTime,
   r_isLocked,
   onClick,
 }) => {
@@ -29,7 +29,7 @@ const RoomBox: React.FC<RoomBoxProps> = ({
         <div className="avatar" />
         <div className="room-text">
           <p className="room-name">{r_name}</p>
-          <p className="room-setting">{r_setting}</p>
+          <p className="room-setting">{r_turnTime}</p>
         </div>
       </div>
       <div className="room-status">

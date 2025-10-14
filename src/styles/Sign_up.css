@@ -33,7 +33,8 @@
 
 .sign-id,
 .sign-password,
-.sign-verify-password {
+.sign-verify-password,
+.sign-name {
     width: 50%;
     height: 30px;
     border-radius: 10px;

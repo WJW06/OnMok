@@ -13,7 +13,7 @@ const SettingModal: React.FC<SettingModalProps> = ({ onClose }) => {
 
   const handleSave = () => {
     console.log("Setting saved:", { bgm, sfx, mute, darkMode });
-    alert("설정이 저장되었습니다!");
+    alert("Save setting!");
     onClose();
   };
 

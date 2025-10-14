@@ -30,7 +30,8 @@ const Login: React.FC = () => {
         console.log(data);
 
         if (data.success) {
-            navigate('/Home', {state: u_id});
+            localStorage.setItem("token", data.token)
+            navigate('/Home');
         }
         else {
             alert(data.message);
