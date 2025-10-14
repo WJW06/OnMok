@@ -1,10 +1,10 @@
 const express = require("express");
 const { Client } = require("pg");
-const cors = require("cors");
-const { v4: uuidv4 } = require("uuid");
 const http = require("http");
+const cors = require("cors");
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
+// const SECRET_KEY = "abcdefg";
 
 require('dotenv').config();
 const SECRET_KEY = process.env.SECRET_KEY;
@@ -15,7 +15,7 @@ if (!SECRET_KEY) {
 
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: "http://localhost:4000", credentials: true }));
 app.use(express.json());
 
 const client = new Client({
@@ -23,14 +23,11 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  // port: 5432, /* 집 */
-  port: 5433, /* 회사 */
+  port: 5432, /* 집 */
+  // port: 5433, /* 회사 */
 });
 
 client.connect();
-app.listen(5000, () => {
-  console.log("Server running on http://localhost:5000");
-});
 
 app.get("/", async (req, res) => {
   try {
@@ -175,16 +172,14 @@ app.post("/JoinRoom", (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "http://localhost:4000",
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
 io.on("connection", (socket) => {
-  console.log("Connect client:", socket.id); // 문제
-
   socket.on("joinRoom", ({ r_id, token }) => {
-    console.log("🔥 joinRoom event received:", r_id, token); // 문제
 
     try {
       const decoded = jwt.verify(token, SECRET_KEY);
@@ -208,10 +203,10 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("leaveRoom", ({ r_id, u_name }) => {
+  socket.on("leaveRoom", ({ r_id, token }) => {
     try {
       const decoded = jwt.verify(token, SECRET_KEY);
-      const { u_name } = decoded;
+      const { u_name } = decoded.u_name;
 
       socket.leave(r_id);
       const room = rooms.get(r_id);
@@ -228,4 +223,8 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("Disconnected:", socket.id);
   });
+});
+
+server.listen(5000, () => {
+  console.log("Socket running on http://localhost:5000")
 });
