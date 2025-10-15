@@ -16,8 +16,8 @@ const PasswordModal: React.FC<PasswordModalProps> = ({ onClose, onSubmit }) => {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal">
+    <div className="password-modal-overlay">
+      <div className="password-modal">
         <h2>Enter Room Password</h2>
         <form onSubmit={handleSubmit}>
           <input
@@ -27,7 +27,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({ onClose, onSubmit }) => {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
-          <div className="modal-buttons">
+          <div className="password-modal-buttons">
             <button type="button" onClick={onClose}>Cancel</button>
             <button type="submit">Enter</button>
           </div>

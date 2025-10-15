@@ -79,7 +79,6 @@ const Home: React.FC = () => {
       setSelectedRoom(room);
       setShowPasswordModal(true);
     } else {
-      alert(`${room.r_id} Enter success!`);
       JoinRoom(room);
     }
   };
@@ -87,7 +86,6 @@ const Home: React.FC = () => {
   const handlePasswordSubmit = (enteredPassword: string) => {
     if (selectedRoom && enteredPassword === selectedRoom.r_password) {
       setShowPasswordModal(false);
-      alert(`${selectedRoom.r_name} Enter success!`);
       JoinRoom(selectedRoom);
     } else {
       alert("Wrong Password");
@@ -128,13 +126,13 @@ const Home: React.FC = () => {
 
           <div className="stats-box">
             <div className="stat-item">
-              <span>{0} Win</span>
+              <span>{20} Win</span>
             </div>
             <div className="stat-item">
-              <span>{0} Lose</span>
+              <span>{5} Lose</span>
             </div>
             <div className="stat-item">
-              <span>{0} Draw</span>
+              <span>{1} Draw</span>
             </div>
           </div>
 
@@ -149,7 +147,6 @@ const Home: React.FC = () => {
         </div>
 
         <button onClick={handleOpenCreateModal}>Create room</button>
-        <button>Search room</button>
         <button>Random room</button>
         <button>Ranking</button>
 
@@ -160,7 +157,16 @@ const Home: React.FC = () => {
       <div className="main-area">
         <div className="room-list-header">
           <h1>Room List</h1>
-          <button className="refresh-btn">🔄</button>
+          <div className="search-container">
+            <label htmlFor="search" className="sr-only">Search</label>
+            <input
+              id="search"
+              type="text"
+              placeholder="Search"
+              className="search-input"
+            />
+            <button className="refresh-btn">🔄</button>
+          </div>
         </div>
 
         <div className="room-list">
