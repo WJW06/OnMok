@@ -33,6 +33,7 @@ u_level integer default 1,
 u_exp integer default 0
 );
 
+insert into "User"(u_id, u_password, u_name) values('','', 'Tester');
 insert into "User"(u_id, u_password, u_name) values('Onmok','Manager', '');
 
 drop table "Room";
@@ -71,6 +72,7 @@ npm install socket.io-client
 npm install uuid
 npm install --save-dev @types/uuid
 npm install jsonwebtoken
+npm install jwt-decode
 
 npm run dev
 

@@ -34,8 +34,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  // port: 5432, /* 집 */
-  port: 5433, /* 회사 */
+  port: 5432, /* 집 */
+  // port: 5433, /* 회사 */
 });
 
 client.connect();
@@ -176,7 +176,6 @@ app.post("/CreateRoom", async (req, res) => {
       roomData.r_player1, roomData.r_player2, turnTime, roomData.r_undo];
     const result = await client.query(query, values);
 
-    console.log("Inserted room: ", result.rows[0]);
     res.json({ success: true, message: "Success sign up!", user: result.rows[0] });
 
   } catch (err) {
@@ -209,7 +208,7 @@ app.post("/JoinRoom", AuthMiddleware, (req, res) => {
 
     const { exp, ...userRest } = req.user;;
     const newToken = jwt.sign(
-      { ...userRest, r_id: r_id },
+      { ...userRest, r_id: r_id},
       SECRET_KEY,
       { expiresIn: "2h" }
     );
@@ -259,20 +258,31 @@ const io = new Server(server, {
 });
 
 io.use((socket, next) => {
-  const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(" ")[1];
-
+  const authHeader = socket.handshake.auth?.token
+                   || socket.handshake.headers?.authorization;
+  let token;
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (typeof authHeader === 'string') {
+    token = authHeader;
+  }
   if (!token) {
     console.log("No token provided in socket connection");
     return next(new Error("Authentication error"));
   }
 
   try {
-    const decoded = jwt.verify(token, SECRET_KEY);
-    socket.data = decoded;
-    next();
+    const decoded = jwt.verify(token, SECRET_KEY, { clockTolerance: 5 });
+    socket.data.datas = decoded;
+    return next();
   } catch (err) {
-    console.error("Invalid token in socket.io:", err);
-    next(new Error("Authentication error"));
+    if (err instanceof jwt.TokenExpiredError) {
+      console.error("Token expired at:", err.expiredAt);
+      return next(new Error("Authentication error: token_expired"));
+    } else {
+      console.error("Invalid token in socket.io:", err);
+      return next(new Error("Authentication error: invalid_token"));
+    }
   }
 });
 
@@ -285,9 +295,9 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("joinRoom", async (r_id) => {
+  socket.on("joinRoom", async () => {
     try {
-      const { u_name } = socket.data;
+      const { u_name, r_id } = socket.data.datas;
 
       socket.join(r_id);
       if (!rooms.has(r_id)) {
@@ -314,9 +324,9 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("leaveRoom", (r_id) => {
+  socket.on("leaveRoom", () => {
     try {
-      const { u_name } = socket.data;
+      const { u_name, r_id } = socket.data.datas;
       const room = rooms.get(r_id);
 
       if (room) {

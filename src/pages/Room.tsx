@@ -3,13 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import "../styles/Room.css";
 
-const token = localStorage.getItem("token");
-export const socket = io("http://localhost:5000", {
-  transports: ["websocket"],
-  withCredentials: true,
-  auth: { token },
-});
-
 export interface RoomInfo {
   r_id: string;
   r_name: string;
@@ -24,14 +17,18 @@ export interface RoomInfo {
   r_undo: boolean;
 }
 
+interface TokenLoad{
+  u_id: string;
+  u_name: string;
+  r_id: string;
+}
+
 const Room: React.FC = () => {
   const navigate = useNavigate();
   const [roomData, setRoomData] = useState<{ room: RoomInfo }>();
+  const token = localStorage.getItem("token");
 
   useEffect(() => {
-    if (!roomData) return;
-
-    const token = localStorage.getItem("token");
     if (!token) {
       alert("Wrong token!");
       console.log("Wrong token!");
@@ -39,7 +36,13 @@ const Room: React.FC = () => {
       return;
     }
 
-    socket.emit("joinRoom", { r_id: roomData?.room.r_id });
+    const socket = io("http://localhost:5000", {
+      transports: ["websocket"],
+      withCredentials: true,
+      auth: { token },  
+    });
+
+    socket.emit("joinRoom");
 
     socket.on("roomUpdate", ({ room }) => {
       console.log("Reload room state:", room);
@@ -52,7 +55,7 @@ const Room: React.FC = () => {
     });
 
     return () => {
-      socket.emit("leaveRoom", { r_id: roomData?.room.r_id });
+      socket.emit("leaveRoom");
       fetch("http://localhost:5000/LeaveRoom", {
         method: "POST",
         headers: {
@@ -62,7 +65,7 @@ const Room: React.FC = () => {
         body: JSON.stringify({ r_id: roomData?.room.r_id }),
       });
     };
-  }, [roomData]);
+  }, [token]);
 
   const handleExit = () => {
     navigate("/Home");
