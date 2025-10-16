@@ -1,17 +1,9 @@
 import React from "react";
+import { RoomInfo } from "../pages/Room";
 import "../styles/RoomBox.css";
 
-export interface Room {
-  r_id: string;
-  r_name: string;
-  r_players: number;
-  r_maxPlayers: number;
-  r_turnTime: string;
-  r_isLocked: boolean;
-  r_password?: string;
-}
 
-interface RoomBoxProps extends Room {
+interface RoomBoxProps extends RoomInfo {
   onClick: () => void;
 }
 

@@ -1,32 +1,41 @@
 import React, { useState } from "react";
+import { v4 as uuidv4 } from "uuid";
+import { RoomInfo } from "../pages/Room";
 import "../styles/CreateBoxModal.css";
 
 interface CreateBoxModalProps {
+    u_master: string;
     onClose: () => void;
-    onCreate: (roomData: {
-        r_name: string;
-        r_password: string;
-        r_players: number;
-        r_turnTime: string;
-        r_undo: boolean;
-    }) => void;
+    onCreate: (roomData: RoomInfo) => void;
 }
 
-const CreateBoxModal: React.FC<CreateBoxModalProps> = ({ onClose, onCreate }) => {
-    const [r_name, setName] = useState<string>("");
-    const [r_password, setPassword] = useState<string>("");
-    const [r_players, setPlayers] = useState<number>(4);
-    const [r_turnTime, setTurnTime] = useState<string>("1 min");
+const CreateBoxModal: React.FC<CreateBoxModalProps> = ({ u_master, onClose, onCreate }) => {
+    const [name, setName] = useState<string>("");
+    const [password, setPassword] = useState<string>("");
+    const [maxPlayers, setMaxPlayers] = useState<number>(4);
+    const [turnTime, setTurnTime] = useState<string>("1 min");
     const [undo, setUndo] = useState(false);
     const [isTurnTimeOpen, setIsTurnTimeOpen] = useState<boolean>(false);
 
     const handleCreate = () => {
-        if (!r_name.trim()) {
+        if (!name.trim()) {
             alert("Input room name!");
             return;
         }
 
-        onCreate({ r_name, r_password, r_players, r_turnTime, r_undo: undo, });
+        onCreate({
+            r_id: uuidv4().slice(0, 8),
+            r_name: name,
+            r_password: password,
+            r_isLocked: password.trim() ? true : false,
+            r_players: 1,
+            r_maxPlayers: maxPlayers,
+            r_roomMaster: u_master,
+            r_player1: "",
+            r_player2: "",
+            r_turnTime: turnTime,
+            r_undo: undo,
+        });
         onClose();
     };
 
@@ -42,7 +51,7 @@ const CreateBoxModal: React.FC<CreateBoxModalProps> = ({ onClose, onCreate }) =>
                     <label>Name</label>
                     <input
                         type="text"
-                        value={r_name}
+                        value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Enter room name"
                     />
@@ -52,7 +61,7 @@ const CreateBoxModal: React.FC<CreateBoxModalProps> = ({ onClose, onCreate }) =>
                     <label>Password</label>
                     <input
                         type="password"
-                        value={r_password}
+                        value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="(Optional)"
                     />
@@ -65,8 +74,8 @@ const CreateBoxModal: React.FC<CreateBoxModalProps> = ({ onClose, onCreate }) =>
                             type="number"
                             min={2}
                             max={16}
-                            value={r_players}
-                            onChange={(e) => setPlayers(Number(e.target.value))}
+                            value={maxPlayers}
+                            onChange={(e) => setMaxPlayers(Number(e.target.value))}
                         />
                     </div>
 
@@ -88,7 +97,7 @@ const CreateBoxModal: React.FC<CreateBoxModalProps> = ({ onClose, onCreate }) =>
                                 className="dropdown-btn"
                                 onClick={() => setIsTurnTimeOpen(!isTurnTimeOpen)}
                             >
-                                {r_turnTime} ▼
+                                {turnTime} ▼
                             </button>
                             {isTurnTimeOpen && (
                                 <ul className="dropdown-menu">
