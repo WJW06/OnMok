@@ -13,9 +13,9 @@ const CreateBoxModal: React.FC<CreateBoxModalProps> = ({ u_master, onClose, onCr
     const [name, setName] = useState<string>("");
     const [password, setPassword] = useState<string>("");
     const [maxPlayers, setMaxPlayers] = useState<number>(4);
-    const [turnTime, setTurnTime] = useState<string>("1 min");
-    const [undo, setUndo] = useState(false);
-    const [isTurnTimeOpen, setIsTurnTimeOpen] = useState<boolean>(false);
+    const [turnTime, setTurnTime] = useState<number>(60);
+    const [isUndo, setUndo] = useState(false);
+    const [isTurnDropDown, setIsTurnDropDown] = useState<boolean>(false);
 
     const handleCreate = () => {
         if (!name.trim()) {
@@ -34,7 +34,7 @@ const CreateBoxModal: React.FC<CreateBoxModalProps> = ({ u_master, onClose, onCr
             r_player1: "",
             r_player2: "",
             r_turnTime: turnTime,
-            r_undo: undo,
+            r_isUndo: isUndo,
         });
         onClose();
     };
@@ -84,7 +84,7 @@ const CreateBoxModal: React.FC<CreateBoxModalProps> = ({ u_master, onClose, onCr
                             Undo
                             <input
                                 type="checkbox"
-                                checked={undo}
+                                checked={isUndo}
                                 onChange={(e) => setUndo(e.target.checked)}
                             />
                         </label>
@@ -95,18 +95,35 @@ const CreateBoxModal: React.FC<CreateBoxModalProps> = ({ u_master, onClose, onCr
                         <div className="dropdown">
                             <button
                                 className="dropdown-btn"
-                                onClick={() => setIsTurnTimeOpen(!isTurnTimeOpen)}
+                                onClick={() => setIsTurnDropDown(!isTurnDropDown)}
                             >
-                                {turnTime} ▼
+                                {turnTime < 60 ? <span>{turnTime} sec</span>
+                                    : <span>{turnTime / 60} min</span>}▼
                             </button>
-                            {isTurnTimeOpen && (
+                            {isTurnDropDown && (
                                 <ul className="dropdown-menu">
                                     {turnOptions.map((option) => (
                                         <li
                                             key={option}
                                             onClick={() => {
-                                                setTurnTime(option);
-                                                setIsTurnTimeOpen(false);
+                                                let time: number = 60;
+                                                switch (option) {
+                                                    case "10 sec":
+                                                        time = 10;
+                                                        break;
+                                                    case "30 sec":
+                                                        time = 30;
+                                                        break;
+                                                    case "1 min":
+                                                        time = 60;
+                                                        break;
+                                                    case "5 min":
+                                                        time = 300;
+                                                        break;
+                                                }
+
+                                                setTurnTime(time);
+                                                setIsTurnDropDown(false);
                                             }}
                                         >
                                             {option}

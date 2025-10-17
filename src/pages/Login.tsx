@@ -1,14 +1,9 @@
 import { useEffect, useState } from 'react';
-import '../styles/Login.css'
 import { useNavigate } from 'react-router-dom';
+import { ReloadToken, socket } from "../socket";
+import '../styles/Login.css'
 
 const Login: React.FC = () => {
-    useEffect(() => {
-        fetch("http://localhost:5000/Login")
-            .then((res) => res.json())
-            .then((data) => { console.log(data) })
-    });
-
     const [u_id, setU_id] = useState("");
     const [u_password, setU_password] = useState("");
     const navigate = useNavigate();
@@ -27,10 +22,10 @@ const Login: React.FC = () => {
         });
 
         const data = await res.json();
-        console.log(data);
-
         if (data.success) {
-            localStorage.setItem("token", data.token)
+            localStorage.setItem("token", data.token);
+            ReloadToken(data.token);
+            socket.connect();
             navigate('/Home');
         }
         else {

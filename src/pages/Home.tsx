@@ -5,6 +5,7 @@ import PasswordModal from "../components/PasswordModal";
 import SettingsModal from "../components/SettingModal";
 import CreateBoxModal from "../components/CreateBoxModal";
 import { RoomInfo } from "../pages/Room";
+import { ReloadToken, socket } from "../socket";
 import "../styles/Home.css";
 
 interface UserInfo {
@@ -18,7 +19,12 @@ interface UserInfo {
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
+  const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [selectedRoom, setSelectedRoom] = useState<RoomInfo | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [rooms, setRooms] = useState<RoomInfo[]>([]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -54,30 +60,38 @@ const Home: React.FC = () => {
       }
     };
 
+    socket.on("roomListUpdate", (rooms) => {
+      console.log("Updated room list:", rooms);
+      setRooms(rooms);
+    });
+
     fetchUser();
+    fetchRooms();
+
+    return () => {
+      socket.off("roomListUpdate");
+    };
   }, []);
 
-  const [rooms, setRooms] = useState<RoomInfo[]>([
-    {
-      r_id: "11111111",
-      r_name: "Room 1",
-      r_password: "1234",
-      r_isLocked: true,
-      r_players: 1,
-      r_maxPlayers: 8,
-      r_roomMaster: "",
-      r_player1: "",
-      r_player2: "",
-      r_turnTime: "1 min",
-      r_undo: false,
-    },
-  ]);
+  useEffect(() => {
+    console.log("Effect set rooms data:", rooms);
+  }, [rooms])
 
-  // const [rooms, setRooms] = useState<Room[]>([]); // 추후에
-  const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
-  const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
-  const [selectedRoom, setSelectedRoom] = useState<RoomInfo | null>(null);
+  async function fetchRooms() {
+    try {
+      const res = await fetch("http://localhost:5000/GetRoomsInfo");
+      const data = await res.json();
+
+      if (data.success) {
+        console.log("data.rooms:", data.rooms);
+        setRooms(data.rooms);
+      } else {
+        console.error("Failed to fetch rooms:", data.message);
+      }
+    } catch (err) {
+      console.error("Error fetching rooms:", err);
+    }
+  };
 
   async function JoinRoom(room: RoomInfo) {
     const token = localStorage.getItem("token");
@@ -100,6 +114,7 @@ const Home: React.FC = () => {
     const data = await res.json();
     if (data.success) {
       localStorage.setItem("token", data.token);
+      ReloadToken(data.token);
       navigate(`/room/${room.r_id}`);
     } else {
       alert(data.message || "Join room failed");
@@ -129,15 +144,26 @@ const Home: React.FC = () => {
   };
 
   const handleCreateRoom = async (room: RoomInfo) => {
-    await fetch("http://localhost:5000/CreateRoom", {
+    const res = await fetch("http://localhost:5000/CreateRoom", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ roomData: room }),
     });
 
-    setRooms((prev) => [...prev, room]);
-    JoinRoom(room);
+    const data = await res.json();
+
+    if (data.success) {
+      socket.emit("createRoom", room);
+      setRooms((prev) => [...prev, room]);
+      JoinRoom(room);
+    } else {
+      alert(data.message || "Faild create!");
+    }
   };
+
+  const handleRandomRoom = () => {
+    console.log(rooms);
+  }
 
   if (!user) return <p>Loading...</p>;
 
@@ -172,7 +198,7 @@ const Home: React.FC = () => {
         </div>
 
         <button onClick={handleOpenCreateModal}>Create room</button>
-        <button>Random room</button>
+        <button onClick={handleRandomRoom}>Random room</button>
         <button>Ranking</button>
 
         <div className="theme-icon" onClick={() => setShowSettings(true)}>⚙️</div>
@@ -195,23 +221,26 @@ const Home: React.FC = () => {
         </div>
 
         <div className="room-list">
-          {rooms.map((room) => (
-            <RoomBox
-              key={room.r_id}
-              r_id={room.r_id}
-              r_name={room.r_name}
-              r_password={room.r_password}
-              r_isLocked={room.r_isLocked}
-              r_players={room.r_players}
-              r_maxPlayers={room.r_maxPlayers}
-              r_roomMaster={room.r_roomMaster}
-              r_player1={room.r_player1}
-              r_player2={room.r_player2}
-              r_turnTime={room.r_turnTime}
-              r_undo={room.r_undo}
-              onClick={() => handleRoomClick(room)}
-            />
-          ))}
+          {rooms.length === 0 ? (
+            <p>No room.</p>
+          ) :
+            rooms.map((room) => (
+              <RoomBox
+                key={room.r_id}
+                r_id={room.r_id}
+                r_name={room.r_name}
+                r_password={room.r_password}
+                r_isLocked={room.r_isLocked}
+                r_players={room.r_players}
+                r_maxPlayers={room.r_maxPlayers}
+                r_roomMaster={room.r_roomMaster}
+                r_player1={room.r_player1}
+                r_player2={room.r_player2}
+                r_turnTime={room.r_turnTime}
+                r_isUndo={room.r_isUndo}
+                onClick={() => handleRoomClick(room)}
+              />
+            ))}
         </div>
       </div>
 

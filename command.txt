@@ -22,6 +22,8 @@ grant all privileges on database "Test_db" to "Test_user";
 
 drop table "User";
 
+// 나중에 not null 추가
+
 create table "User"(
 u_id varchar(20) primary key,
 u_password varchar(30),
@@ -33,8 +35,8 @@ u_level integer default 1,
 u_exp integer default 0
 );
 
-insert into "User"(u_id, u_password, u_name) values('','', 'Tester');
-insert into "User"(u_id, u_password, u_name) values('Onmok','Manager', '');
+insert into "User"(u_id, u_password, u_name) values('', '', 'Tester');
+insert into "User"(u_id, u_password, u_name) values('Onmok', 'Manager', '');
 
 drop table "Room";
 
@@ -52,8 +54,15 @@ r_turnTime integer,
 r_undo boolean
 );
 
-delete from "Room"; 
-insert into "Room" values('11111111', 'Room 1', '1234', true, 1, 8, '', '', '', 60, true);
+delete from "Room";
+
+create table "UserRoom"(
+u_id varchar(20) primary key references "User" (u_id),
+r_id varchar(8) references "Room"(r_id)
+);
+
+delete from "UserRoom";
+insert into "UserRoom" values('', null);
 
 c_id integer forgin
 ================================================================================
@@ -73,6 +82,11 @@ npm install uuid
 npm install --save-dev @types/uuid
 npm install jsonwebtoken
 npm install jwt-decode
+npm install -g nodemon
+(windows powershell 관리자 권한 실행)
+executionpolicy
+set-executionpolicy unrestricted
+y
 
 npm run dev
 
@@ -83,3 +97,9 @@ npm run dev
 win: 3
 lose: 1
 draw: 2
+
+
+(아직)
+npm run build
+npm install -g serve
+serve -s build

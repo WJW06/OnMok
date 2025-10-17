@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { io } from "socket.io-client";
+import { ReloadToken, socket } from "../socket";
 import "../styles/Room.css";
 
 export interface RoomInfo {
@@ -13,19 +13,13 @@ export interface RoomInfo {
   r_roomMaster: string;
   r_player1: string;
   r_player2: string;
-  r_turnTime: string;
-  r_undo: boolean;
-}
-
-interface TokenLoad{
-  u_id: string;
-  u_name: string;
-  r_id: string;
+  r_turnTime: number;
+  r_isUndo: boolean;
 }
 
 const Room: React.FC = () => {
   const navigate = useNavigate();
-  const [roomData, setRoomData] = useState<{ room: RoomInfo }>();
+  const [roomData, setRoomData] = useState<RoomInfo | null>(null);
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -36,17 +30,11 @@ const Room: React.FC = () => {
       return;
     }
 
-    const socket = io("http://localhost:5000", {
-      transports: ["websocket"],
-      withCredentials: true,
-      auth: { token },  
-    });
-
     socket.emit("joinRoom");
 
     socket.on("roomUpdate", ({ room }) => {
       console.log("Reload room state:", room);
-      setRoomData({ room });
+      setRoomData(room);
     });
 
     socket.on("roomError", (msg) => {
@@ -55,32 +43,47 @@ const Room: React.FC = () => {
     });
 
     return () => {
+      socket.off("roomUpdate");
+      socket.off("roomError");
       socket.emit("leaveRoom");
-      fetch("http://localhost:5000/LeaveRoom", {
+    };
+  }, []);
+
+  const handleExit = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/LeaveRoom", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ r_id: roomData?.room.r_id }),
+        body: JSON.stringify({ r_id: roomData?.r_id }),
       });
-    };
-  }, [token]);
 
-  const handleExit = () => {
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem("token", data.token);
+        ReloadToken(data.token);
+      } else {
+        alert(data.message || "Join room failed");
+      }
+
+    } catch (err) {
+      console.error("LeaveRoom error:", err);
+    }
     navigate("/Home");
   };
 
   return (
     <div className="room-container">
       <div className="room-header">
-        <h1 className="room-name">{roomData?.room.r_name}</h1>
+        <h1 className="room-name">{roomData?.r_name}</h1>
         <button className="close-btn" onClick={handleExit}>✖</button>
       </div>
 
       <div className="players">
         <div className="player">
-          <h2>{roomData?.room.r_player1}</h2>
+          <h2>{roomData?.r_player1}</h2>
           <p className="record">{10} win {2} lose {1} draw</p>
           <div className="buttons">
             <button className="btn leave">leave</button>
@@ -92,7 +95,7 @@ const Room: React.FC = () => {
         <h2 className="vs">VS</h2>
 
         <div className="player">
-          <h2>{roomData?.room.r_player2}</h2>
+          <h2>{roomData?.r_player2}</h2>
           <p className="record">{3} win {1} lose {0} draw</p>
           <div className="buttons">
             <button className="btn ready">Ready</button>

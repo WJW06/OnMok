@@ -8,11 +8,17 @@ interface RoomBoxProps extends RoomInfo {
 }
 
 const RoomBox: React.FC<RoomBoxProps> = ({
+  r_id,
   r_name,
+  r_password,
+  r_isLocked,
   r_players,
   r_maxPlayers,
+  r_roomMaster,
+  r_player1,
+  r_player2,
   r_turnTime,
-  r_isLocked,
+  r_isUndo,
   onClick,
 }) => {
   return (
@@ -21,7 +27,8 @@ const RoomBox: React.FC<RoomBoxProps> = ({
         <div className="avatar" />
         <div className="room-text">
           <p className="room-name">{r_name}</p>
-          <p className="room-setting">{r_turnTime}</p>
+          <p className="room-setting">{r_turnTime < 60 ? <span>{r_turnTime} sec</span>
+            : <span>{r_turnTime / 60} min</span>} {r_isUndo && <span>Can undo</span>}</p>
         </div>
       </div>
       <div className="room-status">
