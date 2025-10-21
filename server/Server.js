@@ -32,19 +32,20 @@ async function getRoomsAndEmit(io, client) {
       r_id: room.r_id,
       r_name: room.r_name,
       r_password: room.r_password,
-      r_isLocked: room.r_islocked,
+      r_isLocked: room.r_isLocked,
       r_players: room.r_players,
-      r_maxPlayers: room.r_maxplayer,
-      r_roomMaster: room.r_roommaster,
+      r_maxPlayers: room.r_maxPlayer,
+      r_roomMaster: room.r_roomMaster,
       r_player1: room.r_player1,
       r_player2: room.r_player2,
-      r_turnTime: room.r_turntime,
+      r_turnTime: room.r_turnTime,
       r_isUndo: room.r_isUndo,
     }));
 
     if (io) {
       io.emit("roomListUpdate", rooms);
     }
+    console.log("rooms:",result.rows);
 
     return rooms;
   } catch (err) {
@@ -63,8 +64,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  // port: 5432, /* 집 */
-  port: 5433, /* 회사 */
+  port: 5432, /* 집 */
+  // port: 5433, /* 회사 */
 });
 
 client.connect();
@@ -238,13 +239,13 @@ app.post("/SearchRoom", async (req, res) => {
       r_id: room.r_id,
       r_name: room.r_name,
       r_password: room.r_password,
-      r_isLocked: room.r_islocked,
+      r_isLocked: room.r_isLocked,
       r_players: room.r_players,
-      r_maxPlayers: room.r_maxplayer,
-      r_roomMaster: room.r_roommaster,
+      r_maxPlayers: room.r_maxPlayer,
+      r_roomMaster: room.r_roomMaster,
       r_player1: room.r_player1,
       r_player2: room.r_player2,
-      r_turnTime: room.r_turntime,
+      r_turnTime: room.r_turnTime,
       r_isUndo: room.r_isUndo,
     }));
 

@@ -26,7 +26,7 @@ const RoomBox: React.FC<RoomBoxProps> = ({
         <div className="room-text">
           <p className="room-name">{r_name}</p>
           <p className="room-setting">{r_turnTime < 60 ? <span>{r_turnTime} sec</span>
-            : <span>{r_turnTime / 60} min</span>} {r_isUndo && <span>Can undo</span>}</p>
+            : <span>{r_turnTime / 60} min</span>} {r_isUndo && <span>& Can undo</span>}</p>
         </div>
       </div>
       <div className="room-status">

@@ -25,14 +25,14 @@ grant all privileges on database "Test_db" to "Test_user";
 drop table "User";
 
 create table "User"(
-u_id varchar(20) primary key,
-u_password varchar(30),
-u_name varchar(40) UNIQUE,
-u_win integer default 0,
-u_lose integer default 0,
-u_draw integer default 0,
-u_level integer default 1,
-u_exp integer default 0
+"u_id" varchar(20) primary key,
+"u_password" varchar(30),
+"u_name" varchar(40) UNIQUE,
+"u_win" integer default 0,
+"u_lose" integer default 0,
+"u_draw" integer default 0,
+"u_level" integer default 1,
+"u_exp" integer default 0
 );
 
 insert into "User"(u_id, u_password, u_name) values('', '', 'Tester');
@@ -42,8 +42,8 @@ insert into "User"(u_id, u_password, u_name) values('Manager', 'Onmok', 'Master'
 drop table "Ranking";
 
 create table "Ranking"(
-rank integer primary key,
-u_id varchar(20) references "User" (u_id)
+"rank" integer primary key,
+"u_id" varchar(20) references "User" (u_id)
 );
 
 insert into "Ranking" values(1, '');
@@ -51,17 +51,17 @@ insert into "Ranking" values(1, '');
 drop table "Room";
 
 create table "Room"(
-r_id varchar(8) primary key,
-r_name varchar(40),
-r_password varchar(30),
-r_isLocked boolean,
-r_players integer,
-r_maxPlayer integer,
-r_roomMaster varchar(40) references "User" (u_name),
-r_player1 varchar(40) references "User" (u_name) default '',
-r_player2 varchar(40) references "User" (u_name) default '',
-r_turnTime integer,
-r_isUndo boolean
+"r_id" varchar(8) primary key,
+"r_name" varchar(40),
+"r_password" varchar(30),
+"r_isLocked" boolean,
+"r_players" integer,
+"r_maxPlayer" integer,
+"r_roomMaster" varchar(40) references "User" (u_name),
+"r_player1" varchar(40) references "User" (u_name) default '',
+"r_player2" varchar(40) references "User" (u_name) default '',
+"r_turnTime" integer,
+"r_isUndo" boolean
 );
 
 
@@ -73,8 +73,8 @@ delete from "Room";
 drop table "UserRoom";
 
 create table "UserRoom"(
-u_id varchar(20) primary key references "User" (u_id),
-r_id varchar(8) references "Room"(r_id)
+"u_id" varchar(20) primary key references "User" (u_id),
+"r_id" varchar(8) references "Room"(r_id)
 );
 
 insert into "UserRoom" values('', null);
