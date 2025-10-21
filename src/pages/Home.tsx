@@ -35,6 +35,8 @@ const Home: React.FC = () => {
         navigate("/Login");
         return;
       }
+      ReloadToken(token);
+      socket.connect();
 
       const res = await fetch("http://localhost:5000/GetUserInfo", {
         headers: {
@@ -161,8 +163,19 @@ const Home: React.FC = () => {
     }
   };
 
-  const handleRandomRoom = () => {
-    console.log(rooms);
+  const handleRandomRoom = async () => {
+    const res = await fetch("http://localhost:5000/RandomRoom", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      JoinRoom(data.room);
+    } else {
+      alert(data.message || "Faild create!");
+    }
   }
 
   if (!user) return <p>Loading...</p>;
@@ -234,8 +247,6 @@ const Home: React.FC = () => {
                 r_players={room.r_players}
                 r_maxPlayers={room.r_maxPlayers}
                 r_roomMaster={room.r_roomMaster}
-                r_player1={room.r_player1}
-                r_player2={room.r_player2}
                 r_turnTime={room.r_turnTime}
                 r_isUndo={room.r_isUndo}
                 onClick={() => handleRoomClick(room)}

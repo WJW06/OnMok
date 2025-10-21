@@ -25,7 +25,6 @@ const Login: React.FC = () => {
         if (data.success) {
             localStorage.setItem("token", data.token);
             ReloadToken(data.token);
-            socket.connect();
             navigate('/Home');
         }
         else {

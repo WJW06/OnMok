@@ -72,6 +72,7 @@ client.connect();
 app.get("/", async (req, res) => {
   try {
     console.log("Enter Login page");
+
   } catch (err) {
     console.error(err);
     res.status(404).send("Not Found");
@@ -81,6 +82,7 @@ app.get("/", async (req, res) => {
 app.get("/Login", async (req, res) => {
   try {
     console.log("Enter Login page");
+
   } catch (err) {
     console.error(err);
     res.status(404).send("Not Found");
@@ -90,6 +92,7 @@ app.get("/Login", async (req, res) => {
 app.get("/Sign_up", async (req, res) => {
   try {
     console.log("Enter Sign page");
+
   } catch (err) {
     console.error(err);
     res.status(404).send("Not Found");
@@ -105,8 +108,9 @@ app.get("/GetUserInfo", AuthMiddleware, async (req, res) => {
 app.get("/GetRoomsInfo", async (req, res) => {
   try {
     const rooms = await getRoomsAndEmit(null, client);
-    console.log("GetRoomsInfo:", rooms);
+
     res.json({ success: true, rooms: rooms });
+
   } catch (err) {
     console.error("GetRooms Error:", err);
     res.status(500).json({ success: false, message: "Failed to load rooms" });
@@ -116,8 +120,9 @@ app.get("/GetRoomsInfo", async (req, res) => {
 app.get("/Ground", async (req, res) => {
   try {
     const result = await client.query("select now()");
-    res.json(result.rows[0]);
     console.log("Enter game");
+    res.json(result.rows[0]);
+
   } catch (err) {
     console.error(err);
     res.status(500).send("DB error");
@@ -128,15 +133,14 @@ app.post("/Login", async (req, res) => {
   const { u_id, u_password } = req.body;
 
   try {
-    const query = `select * from "User" where u_id = $1`;
-    const result = await client.query(query, [u_id]);
+    const userQuery = `select * from "User" where u_id = $1`;
+    const result = await client.query(userQuery, [u_id]);
 
     if (result.rows.length === 0) {
       return res.status(401).json({ success: false, message: "This ID does not exist." });
     }
 
     const user = result.rows[0];
-
     if (user.u_password !== u_password) {
       return res.status(401).json({ success: false, message: "The password is different." });
     }
@@ -147,7 +151,7 @@ app.post("/Login", async (req, res) => {
       { expiresIn: "30min" }
     );
 
-    console.log(`${u_id} logged in successfully`);
+    console.log(`"${u_id}" logged in successfully`);
     res.json({ success: true, token, message: "Success Login!" });
 
   } catch (err) {
@@ -160,9 +164,9 @@ app.post("/Sign_up", async (req, res) => {
   const { u_id, u_password, u_name } = req.body;
 
   try {
-    const query = `insert into "User"(u_id, u_password, u_name) values($1, $2, $3) returning *`;
+    const userQuery = `insert into "User"(u_id, u_password, u_name) values($1, $2, $3) returning *`;
     const values = [u_id, u_password, u_name];
-    const result = await client.query(query, values);
+    const result = await client.query(userQuery, values);
     await client.query(`insert into "UserRoom" values($1, null)`, [u_id]);
 
     console.log("Inserted user: ", result.rows[0]);
@@ -191,17 +195,30 @@ app.post("/CreateRoom", async (req, res) => {
   const { roomData } = req.body;
 
   try {
-    const query = `insert into "Room" values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning *`;
+    const roomQuery = `insert into "Room" values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning *`;
     const values = [
       roomData.r_id, roomData.r_name, roomData.r_password, roomData.r_isLocked,
       roomData.r_players, roomData.r_maxPlayers, roomData.r_roomMaster,
       roomData.r_player1, roomData.r_player2, roomData.r_turnTime, roomData.r_undo];
-    const result = await client.query(query, values);
+    const result = await client.query(roomQuery, values);
 
     res.json({ success: true, message: "Success sign up!", user: result.rows[0] });
 
   } catch (err) {
     console.error("Create DB Error: ", err);
+    res.status(500).json({ success: false, message: "DB Error" });
+  }
+});
+
+app.post("/RandomRoom", async (req, res) => {
+  try {
+    const randomQuery = `select r_id from "Room" where r_isLocked = false order by RANDOM() limit 1;`;
+    const result = await client.query(randomQuery);
+
+    res.json({ success: true, message: "Random join room.", room: result.rows[0] });
+
+  } catch (err) {
+    console.error("Random DB Error: ", err);
     res.status(500).json({ success: false, message: "DB Error" });
   }
 });
@@ -215,16 +232,22 @@ app.post("/JoinRoom", AuthMiddleware, async (req, res) => {
   }
 
   try {
-    const query_1 = `select * from "Room" where r_id = $1;`;
-    const room = await client.query(query_1, [r_id]);
+    const selectRoomQuery = `select r_players from "Room" where r_id = $1;`;
+    const room = await client.query(selectRoomQuery, [r_id]);
 
     if (!room.rows) {
       console.log("Not enabled room!");
       return;
     }
 
-    const query_2 = `update "UserRoom" set r_id = $1 where u_id = $2 returning *;`;
-    const userRoom = await client.query(query_2, [r_id, u_id]);
+    const players = room.rows[0].r_players;
+    const joinPlayerQuery = `update "Room" set r_players = $1 where r_id = $2;`;
+    await client.query(joinPlayerQuery, [players + 1, r_id]);
+
+    const joinRoomQuery = `update "UserRoom" set r_id = $1 where u_id = $2 returning *;`;
+    const userRoom = await client.query(joinRoomQuery, [r_id, u_id]);
+
+    console.log("userRoom:", userRoom.rows);
 
     if (!userRoom.rowCount) {
       console.log("Not found user!");
@@ -248,26 +271,35 @@ app.post("/JoinRoom", AuthMiddleware, async (req, res) => {
 
 app.post("/LeaveRoom", AuthMiddleware, async (req, res) => {
   const { r_id } = req.body;
-  const { u_id } = req.user;
+  const { u_id, u_name } = req.user;
 
   if (!r_id) {
     return res.status(400).json({ success: false, message: "No room provided" });
   }
 
   try {
-    const query_1 = `update "UserRoom" set r_id = null where u_id = $1 returning *;`;
-    const userRoom = await client.query(query_1, [u_id]);
+    const leaveP1Query = `update "Room" set r_player1 = '' where r_player1 = $1;`
+    await client.query(leaveP1Query, [u_name]);
+    const leaveP2Query = `update "Room" set r_player2 = '' where r_player2 = $1;`
+    await client.query(leaveP2Query, [u_name]);
+
+    const leaveRoomQuery = `update "UserRoom" set r_id = null where u_id = $1 returning *;`;
+    const userRoom = await client.query(leaveRoomQuery, [u_id]);
 
     if (!userRoom.rowCount) {
       console.log("Not found user!");
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    const query_2 = `select r_players from "Room" where r_id = $1;`;
-    const room = await client.query(query_2, [r_id]);
+    const getPlayersQuery = `select r_players from "Room" where r_id = $1;`;
+    const room = await client.query(getPlayersQuery, [r_id]);
+    const players = room.rows[0].r_players;
 
-    if (room.rows[0] === 1) {
-      await client.query(`delete from "Room" where r_id = $1`, [r_id]);
+    const leavePlayerQuery = `update "Room" set r_players = $1 where r_id = $2;`;
+    await client.query(leavePlayerQuery, [players - 1, r_id]);
+
+    if (players === 1) {
+      await client.query(`delete from "Room" where r_id = $1;`, [r_id]);
       console.log(`Remove room (${r_id})`);
     }
 
@@ -282,6 +314,68 @@ app.post("/LeaveRoom", AuthMiddleware, async (req, res) => {
 
   } catch (err) {
     console.error("LeaveRoom Error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+app.post("/PlayerJoin", AuthMiddleware, async (req, res) => {
+  const { r_id, p_num } = req.body;
+  const { u_name } = req.user;
+
+  if (!r_id) {
+    return res.status(400).json({ success: false, message: "No room provided" });
+  }
+
+  try {
+    const playerJoinQuery = p_num === 1
+      ? `update "Room" set r_player1 = $1 where r_id = $2 and r_player1 = '' and r_player2 != $3;`
+      : `update "Room" set r_player2 = $1 where r_id = $2 and r_player2 = '' and r_player1 != $3;`;
+    const result = await client.query(playerJoinQuery, [u_name, r_id, u_name]);
+    if (result.rowCount === 0) {
+      return res.json({ success: false, message: "Seat already taken" });
+    }
+
+    const roomQuery = `select * from "Room" where r_id = $1;`;
+    const room = await client.query(roomQuery, [r_id]);
+    const roomData = room.rows[0];
+
+    io.to(r_id).emit("roomUpdate", { room: roomData });
+
+    res.json({ success: true, message: `Player ${p_num} joined successfully`, user: u_name });
+
+  } catch (err) {
+    console.error("PlayerJoin Error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+app.post("/PlayerLeave", AuthMiddleware, async (req, res) => {
+  const { r_id, p_num } = req.body;
+  const { u_name } = req.user;
+
+  if (!r_id) {
+    return res.status(400).json({ success: false, message: "No room provided" });
+  }
+
+  try {
+    const playerLeaveQuery = p_num === 1
+      ? `update "Room" set r_player1 = '' where r_id = $1 and r_player1 = $2;`
+      : `update "Room" set r_player2 = '' where r_id = $1 and r_player2 = $2;`;
+    const result = await client.query(playerLeaveQuery, [r_id, u_name]);
+    if (result.rowCount === 0) {
+      return res.json({ success: false, message: "Not same user" });
+    }
+
+    const roomQuery = `select * from "Room" where r_id = $1;`;
+    const room = await client.query(roomQuery, [r_id]);
+    const roomData = room.rows[0];
+
+    io.to(r_id).emit("roomUpdate", { room: roomData });
+
+    res.json({ success: true, message: `Player ${p_num} joined successfully` });
+
+  } catch (err) {
+    console.error("PlayerLeave Error:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -306,6 +400,8 @@ io.use((socket, next) => {
   } else if (typeof authHeader === 'string') {
     token = authHeader;
   }
+  console.log("token provided is:", token);
+
   if (!token) {
     console.log("No token provided in socket connection");
     return next(new Error("Authentication error"));
@@ -329,6 +425,7 @@ io.use((socket, next) => {
 
 io.on("connection", (socket) => {
   console.log("Success socket connection!");
+
   socket.on("connect_error", (err) => {
     console.error("Socket connection error:", err.message);
     if (err.message === "Authentication error") {
@@ -350,8 +447,8 @@ io.on("connection", (socket) => {
   socket.on("joinRoom", async () => {
     try {
       const { u_id, u_name } = socket.data.datas;
-      const query_1 = `select r_id from "UserRoom" where u_id = $1;`;
-      const result = await client.query(query_1, [u_id]);
+      const joinRoomQuery = `select r_id from "UserRoom" where u_id = $1;`;
+      const result = await client.query(joinRoomQuery, [u_id]);
 
       if (result.rows[0] === null) {
         console.log("This user not join room");
@@ -362,8 +459,8 @@ io.on("connection", (socket) => {
       const r_id = result.rows[0].r_id;
       socket.join(r_id);
 
-      const query_2 = `select * from "Room" where r_id = $1;`;
-      const room = await client.query(query_2, [r_id]);
+      const roomQuery = `select * from "Room" where r_id = $1;`;
+      const room = await client.query(roomQuery, [r_id]);
       const roomData = room.rows[0];
 
       io.to(r_id).emit("roomUpdate", { room: roomData });
@@ -380,8 +477,8 @@ io.on("connection", (socket) => {
   socket.on("leaveRoom", async () => {
     try {
       const { u_id, u_name } = socket.data.datas;
-      const query_1 = `select r_id from "UserRoom" where u_id = $1;`;
-      const result = await client.query(query_1, [u_id]);
+      const leaveRoomQuery = `select r_id from "UserRoom" where u_id = $1;`;
+      const result = await client.query(leaveRoomQuery, [u_id]);
 
       if (result.rows[0] === null) {
         console.log("This user not join room");
@@ -390,8 +487,8 @@ io.on("connection", (socket) => {
       }
 
       const r_id = result.rows[0].r_id;
-      const query_2 = `select * from "Room" where r_id = $1;`;
-      const room = await client.query(query_2, [r_id]);
+      const roomQuery = `select * from "Room" where r_id = $1;`;
+      const room = await client.query(roomQuery, [r_id]);
 
       if (room.rows[0] === 0) {
         io.to(r_id).emit("roomUpdate", { room });

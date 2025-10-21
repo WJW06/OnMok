@@ -37,6 +37,7 @@ u_exp integer default 0
 
 insert into "User"(u_id, u_password, u_name) values('', '', 'Tester');
 insert into "User"(u_id, u_password, u_name) values('Onmok', 'Manager', '');
+insert into "User"(u_id, u_password, u_name) values('Manager', 'Onmok', 'Master');
 
 drop table "Room";
 
@@ -48,13 +49,18 @@ r_isLocked boolean,
 r_players integer,
 r_maxPlayer integer,
 r_roomMaster varchar(40) references "User" (u_name),
-r_player1 varchar(40) references "User" (u_name),
-r_player2 varchar(40) references "User" (u_name),
+r_player1 varchar(40) references "User" (u_name) default '',
+r_player2 varchar(40) references "User" (u_name) default '',
 r_turnTime integer,
-r_undo boolean
+r_isUndo boolean
 );
 
 delete from "Room";
+
+insert into "Room" values(11111111, 'Test_Room', 1234, true, 2, 8, 'Master', '', '', 10, true);
+insert into "Room" values(22222222, 'Room_Test', 4321, false, 4, 16, '', '', '', 360, false);
+
+drop table "UserRoom";
 
 create table "UserRoom"(
 u_id varchar(20) primary key references "User" (u_id),

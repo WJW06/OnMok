@@ -11,8 +11,6 @@ export interface RoomInfo {
   r_players: number;
   r_maxPlayers: number;
   r_roomMaster: string;
-  r_player1: string;
-  r_player2: string;
   r_turnTime: number;
   r_isUndo: boolean;
 }
@@ -20,6 +18,8 @@ export interface RoomInfo {
 const Room: React.FC = () => {
   const navigate = useNavigate();
   const [roomData, setRoomData] = useState<RoomInfo | null>(null);
+  const [player1, setPlayer1] = useState<string>("");
+  const [player2, setPlayer2] = useState<string>("");
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -74,6 +74,58 @@ const Room: React.FC = () => {
     navigate("/Home");
   };
 
+  const handlePlayerJoin = async (pNum: number) => {
+    try {
+      const res = await fetch("http://localhost:5000/PlayerJoin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ r_id: roomData?.r_id, p_num: pNum }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        if (pNum === 1) setPlayer1(data.user);
+        else setPlayer2(data.user);
+
+        console.log(data.message);
+      } else {
+        console.error(data.message);
+      }
+
+    } catch (err) {
+      console.error("Player1 join error:", err);
+    }
+  }
+
+  const handlePlayerLeave = async (pNum: number) => {
+    try {
+      const res = await fetch("http://localhost:5000/PlayerLeave", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ r_id: roomData?.r_id, p_num: pNum }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        if (pNum === 1) setPlayer1("");
+        else setPlayer2("");
+
+        console.log(data.message);
+      } else {
+        console.error(data.message);
+      }
+
+    } catch (err) {
+      console.error("Player1 leave error:", err);
+    }
+  }
+
   return (
     <div className="room-container">
       <div className="room-header">
@@ -83,11 +135,11 @@ const Room: React.FC = () => {
 
       <div className="players">
         <div className="player">
-          <h2>{roomData?.r_player1}</h2>
+          <h2>{player1}</h2>
           <p className="record">{10} win {2} lose {1} draw</p>
           <div className="buttons">
-            <button className="btn leave">leave</button>
-            <button className="btn join">join</button>
+            <button className="btn leave" onClick={() => handlePlayerLeave(1)}>leave</button>
+            <button className="btn join" onClick={() => handlePlayerJoin(1)}>join</button>
             <button className="btn ready">Ready</button>
           </div>
         </div>
@@ -95,12 +147,12 @@ const Room: React.FC = () => {
         <h2 className="vs">VS</h2>
 
         <div className="player">
-          <h2>{roomData?.r_player2}</h2>
+          <h2>{player2}</h2>
           <p className="record">{3} win {1} lose {0} draw</p>
           <div className="buttons">
             <button className="btn ready">Ready</button>
-            <button className="btn join">join</button>
-            <button className="btn leave">leave</button>
+            <button className="btn join" onClick={() => handlePlayerJoin(2)}>join</button>
+            <button className="btn leave" onClick={() => handlePlayerLeave(2)}>leave</button>
           </div>
         </div>
       </div>

@@ -15,8 +15,6 @@ const RoomBox: React.FC<RoomBoxProps> = ({
   r_players,
   r_maxPlayers,
   r_roomMaster,
-  r_player1,
-  r_player2,
   r_turnTime,
   r_isUndo,
   onClick,

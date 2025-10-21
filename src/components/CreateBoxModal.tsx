@@ -28,11 +28,9 @@ const CreateBoxModal: React.FC<CreateBoxModalProps> = ({ u_master, onClose, onCr
             r_name: name,
             r_password: password,
             r_isLocked: password.trim() ? true : false,
-            r_players: 1,
+            r_players: 0,
             r_maxPlayers: maxPlayers,
             r_roomMaster: u_master,
-            r_player1: "",
-            r_player2: "",
             r_turnTime: turnTime,
             r_isUndo: isUndo,
         });
