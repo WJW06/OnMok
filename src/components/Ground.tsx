@@ -1,6 +1,6 @@
+import React, { useEffect, useRef, useState } from 'react';
 import '../styles/Ground.css';
 import '../styles/Ground-responsive.css';
-import { useEffect, useRef, useState } from 'react';
 
 // [Game setting (*Don't touch*)]
 const rcCount: number = 18;

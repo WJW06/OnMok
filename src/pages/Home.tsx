@@ -178,6 +178,26 @@ const Home: React.FC = () => {
     }
   }
 
+  const handleRanking = () => {
+    navigate('/Ranking');
+  }
+
+  async function SearchRoom(text: string) {
+    const res = await fetch("http://localhost:5000/SearchRoom", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      setRooms(data.rooms);
+    } else {
+      alert(data.message || "Faild search rooms!");
+    }
+  }
+
   if (!user) return <p>Loading...</p>;
 
   return (
@@ -212,7 +232,7 @@ const Home: React.FC = () => {
 
         <button onClick={handleOpenCreateModal}>Create room</button>
         <button onClick={handleRandomRoom}>Random room</button>
-        <button>Ranking</button>
+        <button onClick={handleRanking}>Ranking</button>
 
         <div className="theme-icon" onClick={() => setShowSettings(true)}>⚙️</div>
       </div>
@@ -228,6 +248,7 @@ const Home: React.FC = () => {
               type="text"
               placeholder="Search"
               className="search-input"
+              onChange={(e) => { SearchRoom(String(e.target.value)) }}
             />
             <button className="refresh-btn">🔄</button>
           </div>

@@ -20,9 +20,9 @@ create database "Test_db" owner "Test_user";
 alter user "Test_user" with login;
 grant all privileges on database "Test_db" to "Test_user";
 
-drop table "User";
-
 // 나중에 not null 추가
+
+drop table "User";
 
 create table "User"(
 u_id varchar(20) primary key,
@@ -38,6 +38,15 @@ u_exp integer default 0
 insert into "User"(u_id, u_password, u_name) values('', '', 'Tester');
 insert into "User"(u_id, u_password, u_name) values('Onmok', 'Manager', '');
 insert into "User"(u_id, u_password, u_name) values('Manager', 'Onmok', 'Master');
+
+drop table "Ranking";
+
+create table "Ranking"(
+rank integer primary key,
+u_id varchar(20) references "User" (u_id)
+);
+
+insert into "Ranking" values(1, '');
 
 drop table "Room";
 
@@ -55,10 +64,11 @@ r_turnTime integer,
 r_isUndo boolean
 );
 
-delete from "Room";
 
 insert into "Room" values(11111111, 'Test_Room', 1234, true, 2, 8, 'Master', '', '', 10, true);
 insert into "Room" values(22222222, 'Room_Test', 4321, false, 4, 16, '', '', '', 360, false);
+
+delete from "Room";
 
 drop table "UserRoom";
 
@@ -67,8 +77,9 @@ u_id varchar(20) primary key references "User" (u_id),
 r_id varchar(8) references "Room"(r_id)
 );
 
-delete from "UserRoom";
 insert into "UserRoom" values('', null);
+
+delete from "UserRoom";
 
 c_id integer forgin
 ================================================================================

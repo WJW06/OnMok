@@ -1,0 +1,34 @@
+.player-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 15px 0;
+}
+
+.player-rank {
+    font-weight: bold;
+    font-size: 1.2em;
+    margin-right: 10px;
+    width: 40px;
+    text-align: right;
+}
+
+.player-box {
+    border: 2px solid #000;
+    border-radius: 6px;
+    background-color: #fff;
+    width: 60%;
+    padding: 10px 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.player-name {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.player-record {
+    font-size: 0.9em;
+    color: #555;
+}

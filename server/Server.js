@@ -39,7 +39,7 @@ async function getRoomsAndEmit(io, client) {
       r_player1: room.r_player1,
       r_player2: room.r_player2,
       r_turnTime: room.r_turntime,
-      r_isUndo: room.r_undo,
+      r_isUndo: room.r_isUndo,
     }));
 
     if (io) {
@@ -199,7 +199,7 @@ app.post("/CreateRoom", async (req, res) => {
     const values = [
       roomData.r_id, roomData.r_name, roomData.r_password, roomData.r_isLocked,
       roomData.r_players, roomData.r_maxPlayers, roomData.r_roomMaster,
-      roomData.r_player1, roomData.r_player2, roomData.r_turnTime, roomData.r_undo];
+      roomData.r_player1, roomData.r_player2, roomData.r_turnTime, roomData.r_isUndo];
     const result = await client.query(roomQuery, values);
 
     res.json({ success: true, message: "Success sign up!", user: result.rows[0] });
@@ -220,6 +220,39 @@ app.post("/RandomRoom", async (req, res) => {
   } catch (err) {
     console.error("Random DB Error: ", err);
     res.status(500).json({ success: false, message: "DB Error" });
+  }
+});
+
+app.post("/SearchRoom", async (req, res) => {
+  const { text } = req.body;
+
+  if (text === '') {
+    const rooms = await getRoomsAndEmit(null, client);
+    return res.json({ success: true, rooms: rooms });
+  }
+
+  try {
+    const searchQuery = `select * from "Room" where r_name like '%'||$1||'%';`;
+    const result = await client.query(searchQuery, [text]);
+    const rooms = result.rows.map(room => ({
+      r_id: room.r_id,
+      r_name: room.r_name,
+      r_password: room.r_password,
+      r_isLocked: room.r_islocked,
+      r_players: room.r_players,
+      r_maxPlayers: room.r_maxplayer,
+      r_roomMaster: room.r_roommaster,
+      r_player1: room.r_player1,
+      r_player2: room.r_player2,
+      r_turnTime: room.r_turntime,
+      r_isUndo: room.r_isUndo,
+    }));
+
+    return res.json({ success: true, rooms: rooms });
+
+  } catch (err) {
+    console.error("SearchRoom Error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
@@ -400,7 +433,6 @@ io.use((socket, next) => {
   } else if (typeof authHeader === 'string') {
     token = authHeader;
   }
-  console.log("token provided is:", token);
 
   if (!token) {
     console.log("No token provided in socket connection");
