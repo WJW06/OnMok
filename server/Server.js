@@ -26,7 +26,9 @@ function AuthMiddleware(req, res, next) {
 
 async function getRoomsAndEmit(io, client) {
   try {
-    const query = `select * from "Room";`;
+    const query = `
+    select * 
+    from "Room";`;
     const result = await client.query(query);
     const rooms = result.rows.map(room => ({
       r_id: room.r_id,
@@ -34,7 +36,7 @@ async function getRoomsAndEmit(io, client) {
       r_password: room.r_password,
       r_isLocked: room.r_isLocked,
       r_players: room.r_players,
-      r_maxPlayers: room.r_maxPlayer,
+      r_maxPlayers: room.r_maxPlayers,
       r_roomMaster: room.r_roomMaster,
       r_player1: room.r_player1,
       r_player2: room.r_player2,
@@ -45,7 +47,6 @@ async function getRoomsAndEmit(io, client) {
     if (io) {
       io.emit("roomListUpdate", rooms);
     }
-    console.log("rooms:",result.rows);
 
     return rooms;
   } catch (err) {
@@ -64,10 +65,9 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  port: 5432, /* 집 */
-  // port: 5433, /* 회사 */
+  // port: 5432, /* 집 */
+  port: 5433, /* 회사 */
 });
-
 client.connect();
 
 app.get("/", async (req, res) => {
@@ -102,7 +102,10 @@ app.get("/Sign_up", async (req, res) => {
 
 app.get("/GetUserInfo", AuthMiddleware, async (req, res) => {
   const u_id = req.user.u_id;
-  const user = await client.query('select u_name, u_win, u_lose, u_draw, u_level, u_exp from "User" where u_id = $1', [u_id]);
+  const user = await client.query(`
+    select "u_name", "u_win", "u_lose", "u_draw", "u_level", "u_exp" 
+    from "User" 
+    where "u_id" = $1`, [u_id]);
   res.json({ success: true, user: user.rows[0] });
 });
 
@@ -134,7 +137,10 @@ app.post("/Login", async (req, res) => {
   const { u_id, u_password } = req.body;
 
   try {
-    const userQuery = `select * from "User" where u_id = $1`;
+    const userQuery = `
+    select * 
+    from "User" 
+    where "u_id" = $1;`;
     const result = await client.query(userQuery, [u_id]);
 
     if (result.rows.length === 0) {
@@ -165,10 +171,15 @@ app.post("/Sign_up", async (req, res) => {
   const { u_id, u_password, u_name } = req.body;
 
   try {
-    const userQuery = `insert into "User"(u_id, u_password, u_name) values($1, $2, $3) returning *`;
+    const userQuery = `
+    insert into "User"("u_id", "u_password", "u_name") 
+    values($1, $2, $3) 
+    returning *`;
     const values = [u_id, u_password, u_name];
     const result = await client.query(userQuery, values);
-    await client.query(`insert into "UserRoom" values($1, null)`, [u_id]);
+    await client.query(`
+      insert into "UserRoom" 
+      values($1, null)`, [u_id]);
 
     console.log("Inserted user: ", result.rows[0]);
     res.json({ success: true, message: "Success sign up!", user: result.rows[0] });
@@ -188,22 +199,32 @@ app.post("/Sign_up", async (req, res) => {
 app.post("/SetUserInfo", AuthMiddleware, async (req, res) => {
   const { u_id } = req.user;
   const { u_name } = req.body;
-  await client.query('update "User" set u_name = $1 where u_id = $2', [u_name, u_id]);
+  await client.query(`
+    update "User" 
+    set "u_name" = $1 
+    where "u_id" = $2`, [u_name, u_id]);
   res.json({ success: true });
 });
 
 app.post("/CreateRoom", async (req, res) => {
   const { roomData } = req.body;
 
+  if (!roomData || !roomData.r_id) {
+    return res.status(400).json({ success: false, message: "Invalid room data" });
+  }
+
   try {
-    const roomQuery = `insert into "Room" values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning *`;
+    const roomQuery = `
+    insert into "Room" 
+    values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+    returning *`;
     const values = [
       roomData.r_id, roomData.r_name, roomData.r_password, roomData.r_isLocked,
       roomData.r_players, roomData.r_maxPlayers, roomData.r_roomMaster,
       roomData.r_player1, roomData.r_player2, roomData.r_turnTime, roomData.r_isUndo];
-    const result = await client.query(roomQuery, values);
+    await client.query(roomQuery, values);
 
-    res.json({ success: true, message: "Success sign up!", user: result.rows[0] });
+    res.json({ success: true, message: "Success sign up!" });
 
   } catch (err) {
     console.error("Create DB Error: ", err);
@@ -213,7 +234,11 @@ app.post("/CreateRoom", async (req, res) => {
 
 app.post("/RandomRoom", async (req, res) => {
   try {
-    const randomQuery = `select r_id from "Room" where r_isLocked = false order by RANDOM() limit 1;`;
+    const randomQuery = `
+    select "r_id" 
+    from "Room" 
+    where "r_isLocked" = false 
+    order by RANDOM() limit 1;`;
     const result = await client.query(randomQuery);
 
     res.json({ success: true, message: "Random join room.", room: result.rows[0] });
@@ -233,7 +258,10 @@ app.post("/SearchRoom", async (req, res) => {
   }
 
   try {
-    const searchQuery = `select * from "Room" where r_name like '%'||$1||'%';`;
+    const searchQuery = `
+    select * 
+    from "Room" 
+    where "r_name" like '%'||$1||'%';`;
     const result = await client.query(searchQuery, [text]);
     const rooms = result.rows.map(room => ({
       r_id: room.r_id,
@@ -241,7 +269,7 @@ app.post("/SearchRoom", async (req, res) => {
       r_password: room.r_password,
       r_isLocked: room.r_isLocked,
       r_players: room.r_players,
-      r_maxPlayers: room.r_maxPlayer,
+      r_maxPlayers: room.r_maxPlayers,
       r_roomMaster: room.r_roomMaster,
       r_player1: room.r_player1,
       r_player2: room.r_player2,
@@ -266,8 +294,11 @@ app.post("/JoinRoom", AuthMiddleware, async (req, res) => {
   }
 
   try {
-    const selectRoomQuery = `select r_players from "Room" where r_id = $1;`;
-    const room = await client.query(selectRoomQuery, [r_id]);
+    const playersQuery = `
+    select "r_players" 
+    from "Room" 
+    where "r_id" = $1;`;
+    const room = await client.query(playersQuery, [r_id]);
 
     if (!room.rows) {
       console.log("Not enabled room!");
@@ -275,13 +306,18 @@ app.post("/JoinRoom", AuthMiddleware, async (req, res) => {
     }
 
     const players = room.rows[0].r_players;
-    const joinPlayerQuery = `update "Room" set r_players = $1 where r_id = $2;`;
+    const joinPlayerQuery = `
+    update "Room" 
+    set "r_players" = $1 
+    where "r_id" = $2;`;
     await client.query(joinPlayerQuery, [players + 1, r_id]);
 
-    const joinRoomQuery = `update "UserRoom" set r_id = $1 where u_id = $2 returning *;`;
+    const joinRoomQuery = `
+    update "UserRoom" 
+    set "r_id" = $1 
+    where "u_id" = $2 
+    returning *;`;
     const userRoom = await client.query(joinRoomQuery, [r_id, u_id]);
-
-    console.log("userRoom:", userRoom.rows);
 
     if (!userRoom.rowCount) {
       console.log("Not found user!");
@@ -312,12 +348,23 @@ app.post("/LeaveRoom", AuthMiddleware, async (req, res) => {
   }
 
   try {
-    const leaveP1Query = `update "Room" set r_player1 = '' where r_player1 = $1;`
+    const leaveP1Query = `
+    update "Room" 
+    set "r_player1" = '' 
+    where "r_player1" = $1;`
     await client.query(leaveP1Query, [u_name]);
-    const leaveP2Query = `update "Room" set r_player2 = '' where r_player2 = $1;`
+
+    const leaveP2Query = `
+    update "Room" 
+    set "r_player2" = '' 
+    where "r_player2" = $1;`
     await client.query(leaveP2Query, [u_name]);
 
-    const leaveRoomQuery = `update "UserRoom" set r_id = null where u_id = $1 returning *;`;
+    const leaveRoomQuery = `
+    update "UserRoom" 
+    set "r_id" = null 
+    where "u_id" = $1 
+    returning *;`;
     const userRoom = await client.query(leaveRoomQuery, [u_id]);
 
     if (!userRoom.rowCount) {
@@ -325,15 +372,22 @@ app.post("/LeaveRoom", AuthMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    const getPlayersQuery = `select r_players from "Room" where r_id = $1;`;
+    const getPlayersQuery = `
+    select "r_players" 
+    from "Room" 
+    where "r_id" = $1;`;
     const room = await client.query(getPlayersQuery, [r_id]);
     const players = room.rows[0].r_players;
-
-    const leavePlayerQuery = `update "Room" set r_players = $1 where r_id = $2;`;
+    const leavePlayerQuery = `
+    update "Room" 
+    set "r_players" = $1 
+    where "r_id" = $2;`;
     await client.query(leavePlayerQuery, [players - 1, r_id]);
 
     if (players === 1) {
-      await client.query(`delete from "Room" where r_id = $1;`, [r_id]);
+      await client.query(`
+        delete from "Room" 
+        where "r_id" = $1;`, [r_id]);
       console.log(`Remove room (${r_id})`);
     }
 
@@ -362,14 +416,27 @@ app.post("/PlayerJoin", AuthMiddleware, async (req, res) => {
 
   try {
     const playerJoinQuery = p_num === 1
-      ? `update "Room" set r_player1 = $1 where r_id = $2 and r_player1 = '' and r_player2 != $3;`
-      : `update "Room" set r_player2 = $1 where r_id = $2 and r_player2 = '' and r_player1 != $3;`;
+      ? `
+      update "Room" 
+      set "r_player1" = $1 
+      where "r_id" = $2 
+      and "r_player1" = '' 
+      and "r_player2" != $3;`
+      : `
+      update "Room" 
+      set "r_player2" = $1 
+      where "r_id" = $2 
+      and "r_player2" = '' 
+      and "r_player1" != $3;`;
     const result = await client.query(playerJoinQuery, [u_name, r_id, u_name]);
     if (result.rowCount === 0) {
       return res.json({ success: false, message: "Seat already taken" });
     }
 
-    const roomQuery = `select * from "Room" where r_id = $1;`;
+    const roomQuery = `
+    select * 
+    from "Room" 
+    where "r_id" = $1;`;
     const room = await client.query(roomQuery, [r_id]);
     const roomData = room.rows[0];
 
@@ -393,14 +460,25 @@ app.post("/PlayerLeave", AuthMiddleware, async (req, res) => {
 
   try {
     const playerLeaveQuery = p_num === 1
-      ? `update "Room" set r_player1 = '' where r_id = $1 and r_player1 = $2;`
-      : `update "Room" set r_player2 = '' where r_id = $1 and r_player2 = $2;`;
+      ? `
+      update "Room" 
+      set "r_player1" = '' 
+      where "r_id" = $1 
+      and "r_player1" = $2;`
+      : `
+      update "Room" 
+      set "r_player2" = '' 
+      where "r_id" = $1 
+      and "r_player2" = $2;`;
     const result = await client.query(playerLeaveQuery, [r_id, u_name]);
     if (result.rowCount === 0) {
       return res.json({ success: false, message: "Not same user" });
     }
 
-    const roomQuery = `select * from "Room" where r_id = $1;`;
+    const roomQuery = `
+    select * 
+    from "Room" 
+    where "r_id" = $1;`;
     const room = await client.query(roomQuery, [r_id]);
     const roomData = room.rows[0];
 
@@ -472,7 +550,7 @@ io.on("connection", (socket) => {
       await getRoomsAndEmit(io, client);
 
     } catch (err) {
-      console.error("CreateRoom Error:", err);
+      console.error("createRoom Error:", err);
       socket.emit("roomError", { message: "Create room faild!" });
     }
   });
@@ -480,19 +558,25 @@ io.on("connection", (socket) => {
   socket.on("joinRoom", async () => {
     try {
       const { u_id, u_name } = socket.data.datas;
-      const joinRoomQuery = `select r_id from "UserRoom" where u_id = $1;`;
-      const result = await client.query(joinRoomQuery, [u_id]);
+      const joinRoomQuery = `
+      select "r_id" 
+      from "UserRoom" 
+      where "u_id" = $1;`;
+      const joinRoom = await client.query(joinRoomQuery, [u_id]);
 
-      if (result.rows[0] === null) {
+      if (!joinRoom.rows[0]) {
         console.log("This user not join room");
         socket.emit("roomError", { message: "joinRoom failed" });
         return;
       }
 
-      const r_id = result.rows[0].r_id;
+      const r_id = joinRoom.rows[0].r_id;
       socket.join(r_id);
 
-      const roomQuery = `select * from "Room" where r_id = $1;`;
+      const roomQuery = `
+      select * 
+      from "Room" 
+      where "r_id" = $1;`;
       const room = await client.query(roomQuery, [r_id]);
       const roomData = room.rows[0];
 
@@ -501,38 +585,91 @@ io.on("connection", (socket) => {
         message: `${u_name} joined`,
         roomInfo: roomData,
       });
+
+      const chatQuery = `
+      select "c_sender", "c_text", "c_created"
+      from "Chat"
+      where "r_id" = $1
+      order by "c_created" desc
+      limit 30;`;
+      const chatResult = await client.query(chatQuery, [r_id]);
+      const chatHistory = chatResult.rows.reverse();
+
+      socket.emit("loadChat", chatHistory);
+
     } catch (err) {
       console.error("joinRoom error:", err);
       socket.emit("roomError", { message: "joinRoom failed" });
     }
   });
 
+  socket.on("sendMessage", async ({ r_id, message }) => {
+    try {
+      const { u_name } = socket.data.datas;
+
+      const insertQuery = `
+      insert into "Chat" ("r_id", "c_sender", "c_text")
+      values ($1, $2, $3);`;
+      await client.query(insertQuery, [r_id, u_name, message]);
+
+      const trimQuery = `
+      delete from "Chat" 
+      where "c_index" not in ( 
+      select "c_index" 
+      from "Chat" 
+      where "r_id" = $1 
+      order by "c_created" desc 
+      limit 30) 
+      and "r_id" = $1;`;
+      await client.query(trimQuery, [r_id]);
+
+      io.to(r_id).emit("newMessage", {
+        c_sender: u_name,
+        c_text: message,
+        c_created: new Date().toISOString(),
+      });
+
+      console.log("newMessage is", { u_name, message });
+
+    } catch (err) {
+      console.error("sendMessage error:", err);
+      socket.emit("chatError", { message: "Failed send message" });
+    }
+  });
+
   socket.on("leaveRoom", async () => {
     try {
       const { u_id, u_name } = socket.data.datas;
-      const leaveRoomQuery = `select r_id from "UserRoom" where u_id = $1;`;
+      const leaveRoomQuery = `
+      select "r_id" 
+      from "UserRoom" 
+      where "u_id" = $1;`;
       const result = await client.query(leaveRoomQuery, [u_id]);
 
-      if (result.rows[0] === null) {
+      if (!result.rows[0]) {
         console.log("This user not join room");
         socket.emit("roomError", { message: "joinRoom failed" });
         return;
       }
 
       const r_id = result.rows[0].r_id;
-      const roomQuery = `select * from "Room" where r_id = $1;`;
+      const roomQuery = `
+      select * 
+      from "Room" 
+      where "r_id" = $1;`;
       const room = await client.query(roomQuery, [r_id]);
 
-      if (room.rows[0] === 0) {
+      if (!room.rows[0]) {
         io.to(r_id).emit("roomUpdate", { room });
         console.log(`Remove room (${r_id})`);
       }
 
-      // 추후 추가
+      // 추후에 추가
       console.log(`left ${u_name} room (${r_id})`);
 
       socket.leave(r_id);
       console.log(`left room (${r_id})`);
+
     } catch (err) {
       console.error("leaveRoom Error:", err);
     }

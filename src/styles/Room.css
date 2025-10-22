@@ -103,6 +103,18 @@
     border-bottom: 2px solid #000;
 }
 
+.chat-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.chat-time {
+    margin-left: 10px;
+    white-space: nowrap;
+}
+
 .input-area {
     display: flex;
     align-items: center;

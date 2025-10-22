@@ -71,6 +71,7 @@ const Home: React.FC = () => {
     fetchRooms();
 
     return () => {
+      console.log("return set rooms data:", rooms);
       socket.off("roomListUpdate");
     };
   }, []);

@@ -15,12 +15,20 @@ export interface RoomInfo {
   r_isUndo: boolean;
 }
 
+interface ChatMessage {
+  c_sender: string;
+  c_text: string;
+  c_created: string;
+}
+
 const Room: React.FC = () => {
   const navigate = useNavigate();
+  const token = localStorage.getItem("token");
   const [roomData, setRoomData] = useState<RoomInfo | null>(null);
   const [player1, setPlayer1] = useState<string>("");
   const [player2, setPlayer2] = useState<string>("");
-  const token = localStorage.getItem("token");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
 
   useEffect(() => {
     if (!token) {
@@ -30,6 +38,10 @@ const Room: React.FC = () => {
       return;
     }
 
+    if (!socket.connected) {
+      console.log("Reconnect socket from Room.tsx");
+      socket.connect();
+    }
     socket.emit("joinRoom");
 
     socket.on("roomUpdate", ({ room }) => {
@@ -42,9 +54,22 @@ const Room: React.FC = () => {
       alert(msg.message);
     });
 
+    socket.on("loadChat", (history: ChatMessage[]) => {
+      console.log("loadChat:", history);
+      setMessages(history);
+    });
+
+    socket.on("newMessage", (message: ChatMessage) => {
+      console.log("newMessage:", message);
+      setMessages((prev) => [...prev, message]);
+    });
+
     return () => {
+      console.log("Room effect return");
       socket.off("roomUpdate");
       socket.off("roomError");
+      socket.off("loadChat");
+      socket.off("newMessage");
       socket.emit("leaveRoom");
     };
   }, []);
@@ -126,6 +151,17 @@ const Room: React.FC = () => {
     }
   }
 
+  function SendMessage() {
+    if (input.trim() === "") return;
+    if (!roomData?.r_id) {
+      console.warn("No room joined yet");
+      return;
+    }
+    socket.emit("sendMessage", { r_id: roomData?.r_id, message: input });
+    console.log("sended message is", input);
+    setInput("");
+  };
+
   return (
     <div className="room-container">
       <div className="room-header">
@@ -159,12 +195,27 @@ const Room: React.FC = () => {
 
       <div className="chat-box">
         <div className="messages">
-          <p><strong>P1:</strong> Hi!</p>
-          <p><strong>P2:</strong> Hello~</p>
+          {messages.map((message, idx) => (
+            <div key={idx} className="chat-line">
+              <div>
+                <strong>{message.c_sender}</strong>: {message.c_text}
+              </div>
+              <span className="chat-time">
+                {new Date(message.c_created).toLocaleTimeString()}
+              </span>
+            </div>
+          ))}
         </div>
+
         <div className="input-area">
-          <input type="text" placeholder="(Input message.)" />
-          <button className="send-btn">➤</button>
+          <input
+            value={input}
+            type="text"
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && SendMessage()}
+            placeholder="(Input message.)"
+          />
+          <button className="send-btn" onClick={SendMessage}>➤</button>
         </div>
       </div>
     </div>

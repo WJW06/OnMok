@@ -22,6 +22,10 @@ grant all privileges on database "Test_db" to "Test_user";
 
 // 나중에 not null 추가
 
+// 컬럼 수정 커맨드
+ALTER TABLE 테이블명 ADD COLUMN "(이름)" (타입) (설정값);
+ALTER TABLE 테이블명 RENAME COLUMN 현재컬럼명 TO 새로운컬럼명;
+
 drop table "User";
 
 create table "User"(
@@ -34,18 +38,16 @@ create table "User"(
 "u_level" integer default 1,
 "u_exp" integer default 0
 );
-
-insert into "User"(u_id, u_password, u_name) values('', '', 'Tester');
-insert into "User"(u_id, u_password, u_name) values('Onmok', 'Manager', '');
-insert into "User"(u_id, u_password, u_name) values('Manager', 'Onmok', 'Master');
+insert into "User"("u_id", "u_password", "u_name") values('', '', 'Tester');
+insert into "User"("u_id", "u_password", "u_name") values('Onmok', 'Manager', '');
+insert into "User"("u_id", "u_password", "u_name") values('Manager', 'Onmok', 'Master');
 
 drop table "Ranking";
 
 create table "Ranking"(
 "rank" integer primary key,
-"u_id" varchar(20) references "User" (u_id)
+"u_id" varchar(20) references "User" ("u_id")
 );
-
 insert into "Ranking" values(1, '');
 
 drop table "Room";
@@ -56,40 +58,42 @@ create table "Room"(
 "r_password" varchar(30),
 "r_isLocked" boolean,
 "r_players" integer,
-"r_maxPlayer" integer,
-"r_roomMaster" varchar(40) references "User" (u_name),
-"r_player1" varchar(40) references "User" (u_name) default '',
-"r_player2" varchar(40) references "User" (u_name) default '',
+"r_maxPlayers" integer,
+"r_roomMaster" varchar(40) references "User" ("u_name"),
+"r_player1" varchar(40) references "User" ("u_name") default '',
+"r_player2" varchar(40) references "User" ("u_name") default '',
 "r_turnTime" integer,
 "r_isUndo" boolean
 );
-
-
 insert into "Room" values(11111111, 'Test_Room', 1234, true, 2, 8, 'Master', '', '', 10, true);
 insert into "Room" values(22222222, 'Room_Test', 4321, false, 4, 16, '', '', '', 360, false);
 
 delete from "Room";
 
+drop table "Chat";
+
+create table "Chat"(
+"c_index" serial primary key,
+"r_id" varchar(8) references "Room" ("r_id") on delete cascade,
+"c_sender" varchar(40) references "User" ("u_name"),
+"c_text" text default '',
+"c_created" timestamptz default now()
+);
+
+delete from "Chat";
+
 drop table "UserRoom";
 
 create table "UserRoom"(
-"u_id" varchar(20) primary key references "User" (u_id),
-"r_id" varchar(8) references "Room"(r_id)
+"u_id" varchar(20) primary key references "User" ("u_id"),  
+"r_id" varchar(8) references "Room"("r_id")
 );
-
 insert into "UserRoom" values('', null);
 
 delete from "UserRoom";
 
 c_id integer forgin
 ================================================================================
-
-create table "Chat"(
-c_id integer primary key,
-c_sender varchar(20) forgin, 
-c_message text,
-r_name varchar(40) forgin
-);
 
 npm install express cors pg
 npm install concurrently --save-dev
