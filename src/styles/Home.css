@@ -144,6 +144,10 @@
   gap: 12px;
 }
 
+.room-list-title {
+  margin-left: 10px;
+}
+
 .search-container {
   display: flex;
   justify-content: flex-end;

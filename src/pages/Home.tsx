@@ -8,13 +8,14 @@ import { RoomInfo } from "../pages/Room";
 import { ReloadToken, socket } from "../socket";
 import "../styles/Home.css";
 
-interface UserInfo {
+export interface UserInfo {
   u_name: string,
   u_win: number,
   u_lose: number,
   u_draw: number,
   u_level: number,
   u_exp: number,
+  u_ranking: number,
 }
 
 const Home: React.FC = () => {
@@ -241,7 +242,7 @@ const Home: React.FC = () => {
       {/* room-list Area */}
       <div className="main-area">
         <div className="room-list-header">
-          <h1>Room List</h1>
+          <h1 className="room-list-title">Room List</h1>
           <div className="search-container">
             <label htmlFor="search" className="sr-only">Search</label>
             <input

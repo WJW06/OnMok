@@ -1,11 +1,14 @@
 .room-container {
     position: relative;
-    width: 800px;
+    width: 90%;
+    max-width: 800px;
+    min-width: 320px;
     margin: 40px auto;
     border: 3px solid #000;
     background: #fff;
     border-radius: 6px;
     font-family: "Comic Sans MS", sans-serif;
+    box-sizing: border-box;
 }
 
 .room-header {
@@ -40,18 +43,23 @@
 
 .players {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-around;
     align-items: center;
-    padding: 40px 20px 20px;
+    padding: 20px;
+    gap: 20px;
 }
 
 .player {
+    flex: 1 1 200px;
     text-align: center;
 }
 
 .vs {
     font-size: 28px;
     font-weight: bold;
+    text-align: center;
+    flex: 0 0 100%;
 }
 
 .record {
@@ -139,4 +147,27 @@
 
 .send-btn:hover {
     color: #0078ff;
+}
+
+@media (max-width: 500px) {
+    .room-name {
+        font-size: 20px;
+    }
+
+    .btn {
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+
+    .record {
+        font-size: 12px;
+    }
+
+    .vs {
+        font-size: 20px;
+    }
+
+    .messages {
+        height: 100px;
+    }
 }

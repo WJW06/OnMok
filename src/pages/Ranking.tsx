@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import PlayerRank, { PlayerRankInfo } from "../components/PlayerRank";
+import PlayerRank from "../components/PlayerRank";
+import { UserInfo } from "../pages/Home";
 import "../styles/Ranking.css";
 
 const Ranking: React.FC = () => {
     const navigate = useNavigate();
-    const [ranking, setRanking] = useState<PlayerRankInfo[]>([]);
+    const [ranking, setRanking] = useState<UserInfo[]>([]);
 
     useEffect(() => {
         fetchRanking();

@@ -420,92 +420,6 @@ app.post("/LeaveRoom", AuthMiddleware, async (req, res) => {
   }
 });
 
-app.post("/PlayerJoin", AuthMiddleware, async (req, res) => {
-  const { r_id, p_num } = req.body;
-  const { u_name } = req.user;
-
-  if (!r_id) {
-    return res.status(400).json({ success: false, message: "No room provided" });
-  }
-
-  try {
-    const playerJoinQuery = p_num === 1
-      ? `
-      update "Room" 
-      set "r_player1" = $1 
-      where "r_id" = $2 
-      and "r_player1" is null 
-      and ("r_player2" != $3 or "r_player2" is null);`
-      : `
-      update "Room" 
-      set "r_player2" = $1 
-      where "r_id" = $2 
-      and "r_player2" is null 
-      and ("r_player1" != $3 or "r_player1" is null);`;
-    const result = await client.query(playerJoinQuery, [u_name, r_id, u_name]);
-    if (result.rowCount === 0) {
-      return res.json({ success: false, message: "Seat already taken" });
-    }
-
-    const roomQuery = `
-    select * 
-    from "Room" 
-    where "r_id" = $1;`;
-    const room = await client.query(roomQuery, [r_id]);
-    const roomData = room.rows[0];
-
-    io.to(r_id).emit("roomUpdate", { room: roomData });
-
-    res.json({ success: true, message: `Player ${p_num} joined successfully`, user: u_name });
-
-  } catch (err) {
-    console.error("PlayerJoin Error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-});
-
-app.post("/PlayerLeave", AuthMiddleware, async (req, res) => {
-  const { r_id, p_num } = req.body;
-  const { u_name } = req.user;
-
-  if (!r_id) {
-    return res.status(400).json({ success: false, message: "No room provided" });
-  }
-
-  try {
-    const playerLeaveQuery = p_num === 1
-      ? `
-      update "Room" 
-      set "r_player1" = null 
-      where "r_id" = $1 
-      and "r_player1" = $2;`
-      : `
-      update "Room" 
-      set "r_player2" = null 
-      where "r_id" = $1 
-      and "r_player2" = $2;`;
-    const result = await client.query(playerLeaveQuery, [r_id, u_name]);
-    if (result.rowCount === 0) {
-      return res.json({ success: false, message: "Not same user" });
-    }
-
-    const roomQuery = `
-    select * 
-    from "Room" 
-    where "r_id" = $1;`;
-    const room = await client.query(roomQuery, [r_id]);
-    const roomData = room.rows[0];
-
-    io.to(r_id).emit("roomUpdate", { room: roomData });
-
-    res.json({ success: true, message: `Player ${p_num} joined successfully` });
-
-  } catch (err) {
-    console.error("PlayerLeave Error:", err);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-});
-
 /* Socket.io */
 
 const server = http.createServer(app);
@@ -614,6 +528,86 @@ io.on("connection", (socket) => {
     } catch (err) {
       console.error("joinRoom error:", err);
       socket.emit("roomError", { message: "joinRoom failed" });
+    }
+  });
+
+  socket.on("playerJoin", async ({ r_id, p_num }) => {
+    const { u_name } = socket.data.datas;
+
+    if (!r_id) {
+      return res.status(400).json({ success: false, message: "No room provided" });
+    }
+
+    try {
+      const playerJoinQuery = p_num === 1
+        ? `
+      update "Room" 
+      set "r_player1" = $1 
+      where "r_id" = $2 
+      and "r_player1" is null 
+      and ("r_player2" != $3 or "r_player2" is null)
+      returning *;`
+        : `
+      update "Room" 
+      set "r_player2" = $1 
+      where "r_id" = $2 
+      and "r_player2" is null 
+      and ("r_player1" != $3 or "r_player1" is null)
+      returning *;`;
+      const result = await client.query(playerJoinQuery, [u_name, r_id, u_name]);
+
+      if (result.rowCount === 0) {
+        console.log("You can't join!");
+        return socket.emit("playerError", { message: "playerJoin failed" });
+      }
+
+      const playerQuery = `
+      select *
+      from "User"
+      where u_name = $1;`;
+      const player = await client.query(playerQuery, [u_name]);
+
+      io.to(r_id).emit("playerUpdate", { player: player.rows[0], p_num: p_num, is_join: true });
+
+    } catch (err) {
+      console.error("playerJoin Error:", err);
+      socket.emit("playerError", { message: "playerJoin failed" });
+    }
+  });
+
+  socket.on("playerLeave", async ({ r_id, p_num }) => {
+    const { u_name } = socket.data.datas;
+
+    if (!r_id) {
+      return res.status(400).json({ success: false, message: "No room provided" });
+    }
+
+    try {
+      const playerLeaveQuery = p_num === 1
+        ? `
+      update "Room" 
+      set "r_player1" = null 
+      where "r_id" = $1 
+      and "r_player1" = $2
+      returning *;`
+        : `
+      update "Room" 
+      set "r_player2" = null 
+      where "r_id" = $1 
+      and "r_player2" = $2
+      returning *;`;
+      const result = await client.query(playerLeaveQuery, [r_id, u_name]);
+
+      if (result.rows === null) {
+        console.log("You can't leave!");
+        return socket.emit("playerError", { message: "playerLeave failed" });
+      }
+
+      io.to(r_id).emit("playerUpdate", { player: null, p_num: p_num, is_join: false });
+
+    } catch (err) {
+      console.error("playerLeave Error:", err);
+      socket.emit("playerError", { message: "playerLeave failed" });
     }
   });
 

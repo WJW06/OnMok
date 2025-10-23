@@ -1,26 +1,18 @@
 import React from "react";
+import { UserInfo } from "../pages/Home";
 import "../styles/PlayerRank.css";
 
-export interface PlayerRankInfo {
-    u_ranking: number;
-    u_name: string;
-    u_win: number;
-    u_lose: number;
-    u_draw: number;
-    u_level: number;
-}
-
-interface PlayerRankProps extends PlayerRankInfo {
+interface PlayerRankProps extends UserInfo {
     onClick: () => void;
 }
 
 const PlayerRank: React.FC<PlayerRankProps> = ({
-    u_ranking,
     u_name,
     u_win,
     u_lose,
     u_draw,
     u_level,
+    u_ranking,
     onClick,
 }) => {
     return (

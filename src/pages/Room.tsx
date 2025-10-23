@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ReloadToken, socket } from "../socket";
+import { UserInfo } from "../pages/Home";
 import "../styles/Room.css";
 
 export interface RoomInfo {
@@ -25,8 +26,10 @@ const Room: React.FC = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
   const [roomData, setRoomData] = useState<RoomInfo | null>(null);
-  const [player1, setPlayer1] = useState<string>("");
-  const [player2, setPlayer2] = useState<string>("");
+  const [player1, setPlayer1] = useState<UserInfo | null>(null);
+  const [player1State, setPlayer1State] = useState({ joined: false, ready: false });
+  const [player2, setPlayer2] = useState<UserInfo | null>(null);
+  const [player2State, setPlayer2State] = useState({ joined: false, ready: false });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
 
@@ -43,6 +46,30 @@ const Room: React.FC = () => {
       socket.connect();
     }
     socket.emit("joinRoom");
+
+    socket.on("playerUpdate", ({ player, p_num, is_join }) => {
+      console.log("Reload player state:", player);
+
+      if (p_num === 1) {
+        setPlayer1(player);
+        if (is_join) {
+          setPlayer1State({ ...player1State, joined: true });
+        } else {
+          setPlayer1State({ ...player1State, joined: false });
+        }
+      } else {
+        setPlayer2(player);
+        if (is_join) {
+          setPlayer2State({ ...player1State, joined: true });
+        } else {
+          setPlayer2State({ ...player1State, joined: false });
+        }
+      }
+    })
+
+    socket.on("playerError", (msg) => {
+      console.error("Player error:", msg);
+    });
 
     socket.on("roomUpdate", ({ room }) => {
       console.log("Reload room state:", room);
@@ -66,6 +93,8 @@ const Room: React.FC = () => {
 
     return () => {
       console.log("Room effect return");
+      socket.off("playerUpdate");
+      socket.off("playerError");
       socket.off("roomUpdate");
       socket.off("roomError");
       socket.off("loadChat");
@@ -99,56 +128,12 @@ const Room: React.FC = () => {
     navigate("/Home");
   };
 
-  const handlePlayerJoin = async (pNum: number) => {
-    try {
-      const res = await fetch("http://localhost:5000/PlayerJoin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ r_id: roomData?.r_id, p_num: pNum }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        if (pNum === 1) setPlayer1(data.user);
-        else setPlayer2(data.user);
-
-        console.log(data.message);
-      } else {
-        console.error(data.message);
-      }
-
-    } catch (err) {
-      console.error("Player1 join error:", err);
-    }
+  const handlePlayerJoin = (pNum: number) => {
+    socket.emit("playerJoin", { r_id: roomData?.r_id, p_num: pNum });
   }
 
-  const handlePlayerLeave = async (pNum: number) => {
-    try {
-      const res = await fetch("http://localhost:5000/PlayerLeave", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ r_id: roomData?.r_id, p_num: pNum }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        if (pNum === 1) setPlayer1("");
-        else setPlayer2("");
-
-        console.log(data.message);
-      } else {
-        console.error(data.message);
-      }
-
-    } catch (err) {
-      console.error("Player1 leave error:", err);
-    }
+  const handlePlayerLeave = (pNum: number) => {
+    socket.emit("playerLeave", { r_id: roomData?.r_id, p_num: pNum });
   }
 
   function SendMessage() {
@@ -168,24 +153,62 @@ const Room: React.FC = () => {
 
       <div className="players">
         <div className="player">
-          <h2>{player1}</h2>
-          <p className="record">{10} win {2} lose {1} draw</p>
+          <h2>{player1?.u_name}</h2>
+          <p className="record">
+            {player1?.u_win} win <> </>
+            {player1?.u_lose} lose <> </>
+            {player1?.u_draw} draw
+          </p>
           <div className="buttons">
-            <button className="btn leave" onClick={() => handlePlayerLeave(1)}>leave</button>
-            <button className="btn join" onClick={() => handlePlayerJoin(1)}>join</button>
-            <button className="btn ready">Ready</button>
+            <button
+              id="p1-leave" className="btn leave"
+              onClick={() => handlePlayerLeave(1)}
+              disabled={!player1State.joined}>
+              leave
+            </button>
+            <button
+              id="p1-join" className="btn join"
+              onClick={() => handlePlayerJoin(1)}
+              disabled={player1State.joined}>
+              join
+            </button>
+            <button
+              id="p1-ready" className="btn ready"
+              onClick={() => { }}
+              disabled={!player1State.joined}>
+              Ready
+            </button>
           </div>
         </div>
 
         <h2 className="vs">VS</h2>
 
         <div className="player">
-          <h2>{player2}</h2>
-          <p className="record">{3} win {1} lose {0} draw</p>
+          <h2>{player2?.u_name}</h2>
+          <p className="record">
+            {player2?.u_win} win <> </>
+            {player2?.u_lose} lose <> </>
+            {player2?.u_draw} draw
+          </p>
           <div className="buttons">
-            <button className="btn ready">Ready</button>
-            <button className="btn join" onClick={() => handlePlayerJoin(2)}>join</button>
-            <button className="btn leave" onClick={() => handlePlayerLeave(2)}>leave</button>
+            <button
+              id="p2-leave" className="btn leave"
+              onClick={() => handlePlayerLeave(2)}
+              disabled={!player2State.joined}>
+              leave
+            </button>
+            <button
+              id="p2-join" className="btn join"
+              onClick={() => handlePlayerJoin(2)}
+              disabled={player2State.joined}>
+              join
+            </button>
+            <button
+              id="p2-ready" className="btn ready"
+              onClick={() => { }}
+              disabled={!player2State.joined}>
+              Ready
+            </button>
           </div>
         </div>
       </div>
