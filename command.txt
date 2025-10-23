@@ -42,6 +42,8 @@ insert into "User"("u_id", "u_password", "u_name") values('', '', 'Tester');
 insert into "User"("u_id", "u_password", "u_name") values('Onmok', 'Manager', '');
 insert into "User"("u_id", "u_password", "u_name") values('Manager', 'Onmok', 'Master');
 
+delete from "User";
+
 drop table "Ranking";
 
 create table "Ranking"(
@@ -60,13 +62,13 @@ create table "Room"(
 "r_players" integer,
 "r_maxPlayers" integer,
 "r_roomMaster" varchar(40) references "User" ("u_name"),
-"r_player1" varchar(40) references "User" ("u_name") default '',
-"r_player2" varchar(40) references "User" ("u_name") default '',
+"r_player1" varchar(40) references "User" ("u_name") default null,
+"r_player2" varchar(40) references "User" ("u_name") default null,
 "r_turnTime" integer,
 "r_isUndo" boolean
 );
-insert into "Room" values(11111111, 'Test_Room', 1234, true, 2, 8, 'Master', '', '', 10, true);
-insert into "Room" values(22222222, 'Room_Test', 4321, false, 4, 16, '', '', '', 360, false);
+insert into "Room" values(11111111, 'Test_Room', 1234, true, 2, 8, 'Master', null, null, 10, true);
+insert into "Room" values(22222222, 'Room_Test', 4321, false, 4, 16, null, null, null, 360, false);
 
 delete from "Room";
 

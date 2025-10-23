@@ -153,10 +153,7 @@ const Room: React.FC = () => {
 
   function SendMessage() {
     if (input.trim() === "") return;
-    if (!roomData?.r_id) {
-      console.warn("No room joined yet");
-      return;
-    }
+
     socket.emit("sendMessage", { r_id: roomData?.r_id, message: input });
     console.log("sended message is", input);
     setInput("");

@@ -2,12 +2,12 @@ import React from "react";
 import "../styles/PlayerRank.css";
 
 export interface PlayerRankInfo {
-    rank: number;
-    name: string;
-    win: number;
-    lose: number;
-    draw: number;
-    level: number;
+    u_ranking: number;
+    u_name: string;
+    u_win: number;
+    u_lose: number;
+    u_draw: number;
+    u_level: number;
 }
 
 interface PlayerRankProps extends PlayerRankInfo {
@@ -15,23 +15,23 @@ interface PlayerRankProps extends PlayerRankInfo {
 }
 
 const PlayerRank: React.FC<PlayerRankProps> = ({
-    rank,
-    name,
-    win,
-    lose,
-    draw,
-    level,
+    u_ranking,
+    u_name,
+    u_win,
+    u_lose,
+    u_draw,
+    u_level,
     onClick,
 }) => {
     return (
         <div className="player-container">
-            <div className="player-rank">#{rank}</div>
+            <div className="player-rank">#{u_ranking}</div>
             <div className="player-box">
                 <p className="player-name">
-                    <strong>{name}</strong> (Lv. {level})
+                    <strong>{u_name}</strong> (Lv. {u_level})
                 </p>
                 <p className="player-record">
-                    {win} win {lose} lose {draw} draw
+                    {u_win} win {u_lose} lose {u_draw} draw
                 </p>
             </div>
         </div>

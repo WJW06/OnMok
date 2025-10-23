@@ -24,33 +24,35 @@ function AuthMiddleware(req, res, next) {
   }
 }
 
-async function getRoomsAndEmit(io, client) {
+async function GetRoomsAndEmit(io, client) {
   try {
     const query = `
     select * 
     from "Room";`;
-    const result = await client.query(query);
-    const rooms = result.rows.map(room => ({
-      r_id: room.r_id,
-      r_name: room.r_name,
-      r_password: room.r_password,
-      r_isLocked: room.r_isLocked,
-      r_players: room.r_players,
-      r_maxPlayers: room.r_maxPlayers,
-      r_roomMaster: room.r_roomMaster,
-      r_player1: room.r_player1,
-      r_player2: room.r_player2,
-      r_turnTime: room.r_turnTime,
-      r_isUndo: room.r_isUndo,
-    }));
+    const rooms = await client.query(query);
 
     if (io) {
-      io.emit("roomListUpdate", rooms);
+      io.emit("roomListUpdate", rooms.rows);
     }
 
-    return rooms;
+    return rooms.rows;
   } catch (err) {
-    console.error("getRoomsAndEmit Error:", err);
+    console.error("GetRoomsAndEmit Error:", err);
+    throw err;
+  }
+}
+
+async function GetRanking(client) {
+  try {
+    const rankingQuery = `
+    select * 
+    from "User"
+    order by "u_ranking" asc;`;
+    const ranking = await client.query(rankingQuery);
+
+    return ranking.rows;
+  } catch (err) {
+    console.error("GetRanking Error:", err);
     throw err;
   }
 }
@@ -111,9 +113,21 @@ app.get("/GetUserInfo", AuthMiddleware, async (req, res) => {
 
 app.get("/GetRoomsInfo", async (req, res) => {
   try {
-    const rooms = await getRoomsAndEmit(null, client);
+    const rooms = await GetRoomsAndEmit(null, client);
 
     res.json({ success: true, rooms: rooms });
+
+  } catch (err) {
+    console.error("GetRooms Error:", err);
+    res.status(500).json({ success: false, message: "Failed to load rooms" });
+  }
+});
+
+app.get("/GetRankingInfo", async (req, res) => {
+  try {
+    const ranking = await GetRanking(client);
+
+    res.json({ success: true, ranking: ranking });
 
   } catch (err) {
     console.error("GetRooms Error:", err);
@@ -350,13 +364,13 @@ app.post("/LeaveRoom", AuthMiddleware, async (req, res) => {
   try {
     const leaveP1Query = `
     update "Room" 
-    set "r_player1" = '' 
+    set "r_player1" = null 
     where "r_player1" = $1;`
     await client.query(leaveP1Query, [u_name]);
 
     const leaveP2Query = `
     update "Room" 
-    set "r_player2" = '' 
+    set "r_player2" = null 
     where "r_player2" = $1;`
     await client.query(leaveP2Query, [u_name]);
 
@@ -420,14 +434,14 @@ app.post("/PlayerJoin", AuthMiddleware, async (req, res) => {
       update "Room" 
       set "r_player1" = $1 
       where "r_id" = $2 
-      and "r_player1" = '' 
-      and "r_player2" != $3;`
+      and "r_player1" is null 
+      and ("r_player2" != $3 or "r_player2" is null);`
       : `
       update "Room" 
       set "r_player2" = $1 
       where "r_id" = $2 
-      and "r_player2" = '' 
-      and "r_player1" != $3;`;
+      and "r_player2" is null 
+      and ("r_player1" != $3 or "r_player1" is null);`;
     const result = await client.query(playerJoinQuery, [u_name, r_id, u_name]);
     if (result.rowCount === 0) {
       return res.json({ success: false, message: "Seat already taken" });
@@ -462,12 +476,12 @@ app.post("/PlayerLeave", AuthMiddleware, async (req, res) => {
     const playerLeaveQuery = p_num === 1
       ? `
       update "Room" 
-      set "r_player1" = '' 
+      set "r_player1" = null 
       where "r_id" = $1 
       and "r_player1" = $2;`
       : `
       update "Room" 
-      set "r_player2" = '' 
+      set "r_player2" = null 
       where "r_id" = $1 
       and "r_player2" = $2;`;
     const result = await client.query(playerLeaveQuery, [r_id, u_name]);
@@ -547,7 +561,7 @@ io.on("connection", (socket) => {
 
   socket.on("createRoom", async () => {
     try {
-      await getRoomsAndEmit(io, client);
+      await GetRoomsAndEmit(io, client);
 
     } catch (err) {
       console.error("createRoom Error:", err);

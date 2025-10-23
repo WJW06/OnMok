@@ -1,16 +1,32 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PlayerRank, { PlayerRankInfo } from "../components/PlayerRank";
 import "../styles/Ranking.css";
 
 const Ranking: React.FC = () => {
     const navigate = useNavigate();
+    const [ranking, setRanking] = useState<PlayerRankInfo[]>([]);
 
-    const players: PlayerRankInfo[] = [
-        { rank: 1, name: "p1", win: 100, lose: 10, draw: 2, level: 100 },
-        { rank: 2, name: "p2", win: 50, lose: 7, draw: 30, level: 53 },
-        { rank: 3, name: "player3", win: 10, lose: 100, draw: 2, level: 77 },
-    ];
+    useEffect(() => {
+        fetchRanking();
+    });
+
+    async function fetchRanking() {
+        try {
+            const res = await fetch("http://localhost:5000/GetRankingInfo");
+            const data = await res.json();
+
+            if (data.success) {
+                console.log("data.ranking:", data.ranking);
+                setRanking(data.ranking);
+            } else {
+                console.error("Failed to fetch ranking:", data.message);
+            }
+
+        } catch (err) {
+            console.error("Error fetching ranking:", err);
+        }
+    }
 
     return (
         <div className="ranking-page">
@@ -22,9 +38,9 @@ const Ranking: React.FC = () => {
             </div>
 
             <div className="ranking-list">
-                {players.map((player) => (
+                {ranking.map((player) => (
                     <PlayerRank
-                        key={player.rank}
+                        key={player.u_ranking}
                         {...player}
                         onClick={() => { }}
                     />
