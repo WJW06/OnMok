@@ -26,16 +26,8 @@ function AuthMiddleware(req, res, next) {
 
 async function GetRoomsAndEmit(io, client) {
   try {
-    const query = `
-    select * 
-    from "Room";`;
-    const rooms = await client.query(query);
+    return RefreshRoomList();
 
-    if (io) {
-      io.emit("roomListUpdate", rooms.rows);
-    }
-
-    return rooms.rows;
   } catch (err) {
     console.error("GetRoomsAndEmit Error:", err);
     throw err;
@@ -53,6 +45,21 @@ async function GetRanking(client) {
     return ranking.rows;
   } catch (err) {
     console.error("GetRanking Error:", err);
+    throw err;
+  }
+}
+
+async function RefreshRoomList() {
+  try {
+    const query = `
+      select * 
+      from "Room";`;
+    const rooms = await client.query(query);
+    if (io) io.emit("roomListUpdate", rooms.rows);
+
+    return rooms.rows;
+  } catch (err) {
+    console.error("RefreshRoomList Error:", err);
     throw err;
   }
 }
@@ -308,35 +315,11 @@ app.post("/JoinRoom", AuthMiddleware, async (req, res) => {
   }
 
   try {
-    const playersQuery = `
-    select "r_players" 
-    from "Room" 
-    where "r_id" = $1;`;
-    const room = await client.query(playersQuery, [r_id]);
-
-    if (!room.rows) {
-      console.log("Not enabled room!");
-      return;
-    }
-
-    const players = room.rows[0].r_players;
-    const joinPlayerQuery = `
-    update "Room" 
-    set "r_players" = $1 
-    where "r_id" = $2;`;
-    await client.query(joinPlayerQuery, [players + 1, r_id]);
-
-    const joinRoomQuery = `
+    const userRoomQuery = `
     update "UserRoom" 
     set "r_id" = $1 
-    where "u_id" = $2 
-    returning *;`;
-    const userRoom = await client.query(joinRoomQuery, [r_id, u_id]);
-
-    if (!userRoom.rowCount) {
-      console.log("Not found user!");
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+    where "u_id" = $2;`;
+    await client.query(userRoomQuery, [r_id, u_id]);
 
     const { exp, ...userRest } = req.user;
     const token = jwt.sign(
@@ -354,57 +337,7 @@ app.post("/JoinRoom", AuthMiddleware, async (req, res) => {
 });
 
 app.post("/LeaveRoom", AuthMiddleware, async (req, res) => {
-  const { r_id } = req.body;
-  const { u_id, u_name } = req.user;
-
-  if (!r_id) {
-    return res.status(400).json({ success: false, message: "No room provided" });
-  }
-
   try {
-    const leaveP1Query = `
-    update "Room" 
-    set "r_player1" = null 
-    where "r_player1" = $1;`
-    await client.query(leaveP1Query, [u_name]);
-
-    const leaveP2Query = `
-    update "Room" 
-    set "r_player2" = null 
-    where "r_player2" = $1;`
-    await client.query(leaveP2Query, [u_name]);
-
-    const leaveRoomQuery = `
-    update "UserRoom" 
-    set "r_id" = null 
-    where "u_id" = $1 
-    returning *;`;
-    const userRoom = await client.query(leaveRoomQuery, [u_id]);
-
-    if (!userRoom.rowCount) {
-      console.log("Not found user!");
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const getPlayersQuery = `
-    select "r_players" 
-    from "Room" 
-    where "r_id" = $1;`;
-    const room = await client.query(getPlayersQuery, [r_id]);
-    const players = room.rows[0].r_players;
-    const leavePlayerQuery = `
-    update "Room" 
-    set "r_players" = $1 
-    where "r_id" = $2;`;
-    await client.query(leavePlayerQuery, [players - 1, r_id]);
-
-    if (players === 1) {
-      await client.query(`
-        delete from "Room" 
-        where "r_id" = $1;`, [r_id]);
-      console.log(`Remove room (${r_id})`);
-    }
-
     const { exp, ...userRest } = req.user;
     const newToken = jwt.sign(
       { ...userRest },
@@ -463,7 +396,7 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
-  console.log("Success socket connection!");
+  console.log("Connected:", socket.id);
 
   socket.on("connect_error", (err) => {
     console.error("Socket connection error:", err.message);
@@ -486,33 +419,49 @@ io.on("connection", (socket) => {
   socket.on("joinRoom", async () => {
     try {
       const { u_id, u_name } = socket.data.datas;
-      const joinRoomQuery = `
-      select "r_id" 
-      from "UserRoom" 
-      where "u_id" = $1;`;
-      const joinRoom = await client.query(joinRoomQuery, [u_id]);
 
-      if (!joinRoom.rows[0]) {
+      const getR_idQuery = `
+      select "r_id"
+      from "UserRoom"
+      where "u_id" = $1;`;
+      const getR_id = await client.query(getR_idQuery, [u_id]);
+
+      if (!getR_id.rows[0]) {
         console.log("This user not join room");
         socket.emit("roomError", { message: "joinRoom failed" });
         return;
       }
 
-      const r_id = joinRoom.rows[0].r_id;
+      const r_id = getR_id.rows[0].r_id;
       socket.join(r_id);
 
       const roomQuery = `
-      select * 
-      from "Room" 
-      where "r_id" = $1;`;
+      update "Room" 
+      set "r_players" = "r_players" + 1
+      where "r_id" = $1
+      returning *;`;
       const room = await client.query(roomQuery, [r_id]);
       const roomData = room.rows[0];
 
-      io.to(r_id).emit("roomUpdate", { room: roomData });
+      const p1Query = `
+      select *
+      from "User"
+      where u_name = $1;`;
+      const p1 = await client.query(p1Query, [roomData.r_player1]);
+
+      const p2Query = `
+      select *
+      from "User"
+      where u_name = $1;`;
+      const p2 = await client.query(p2Query, [roomData.r_player2]);
+
+      io.to(r_id).emit("roomUpdate", { room: roomData, p1: p1.rows[0], p2: p2.rows[0] });
       socket.emit("joinRoomSuccess", {
         message: `${u_name} joined`,
         roomInfo: roomData,
       });
+
+      RefreshRoomList();
 
       const chatQuery = `
       select "c_sender", "c_text", "c_created"
@@ -541,17 +490,17 @@ io.on("connection", (socket) => {
     try {
       const playerJoinQuery = p_num === 1
         ? `
-      update "Room" 
-      set "r_player1" = $1 
-      where "r_id" = $2 
-      and "r_player1" is null 
+      update "Room"
+      set "r_player1" = $1
+      where "r_id" = $2
+      and "r_player1" is null
       and ("r_player2" != $3 or "r_player2" is null)
       returning *;`
         : `
-      update "Room" 
-      set "r_player2" = $1 
-      where "r_id" = $2 
-      and "r_player2" is null 
+      update "Room"
+      set "r_player2" = $1
+      where "r_id" = $2
+      and "r_player2" is null
       and ("r_player1" != $3 or "r_player1" is null)
       returning *;`;
       const result = await client.query(playerJoinQuery, [u_name, r_id, u_name]);
@@ -585,25 +534,22 @@ io.on("connection", (socket) => {
     try {
       const playerLeaveQuery = p_num === 1
         ? `
-      update "Room" 
-      set "r_player1" = null 
-      where "r_id" = $1 
+      update "Room"
+      set "r_player1" = null
+      where "r_id" = $1
       and "r_player1" = $2
       returning *;`
         : `
-      update "Room" 
-      set "r_player2" = null 
-      where "r_id" = $1 
+      update "Room"
+      set "r_player2" = null
+      where "r_id" = $1
       and "r_player2" = $2
       returning *;`;
       const result = await client.query(playerLeaveQuery, [r_id, u_name]);
 
-      if (result.rows === null) {
-        console.log("You can't leave!");
-        return socket.emit("playerError", { message: "playerLeave failed" });
+      if (result.rows[0]) {
+        io.to(r_id).emit("playerUpdate", { player: null, p_num: p_num, is_join: false });
       }
-
-      io.to(r_id).emit("playerUpdate", { player: null, p_num: p_num, is_join: false });
 
     } catch (err) {
       console.error("playerLeave Error:", err);
@@ -648,27 +594,69 @@ io.on("connection", (socket) => {
   socket.on("leaveRoom", async () => {
     try {
       const { u_id, u_name } = socket.data.datas;
-      const leaveRoomQuery = `
-      select "r_id" 
-      from "UserRoom" 
-      where "u_id" = $1;`;
-      const result = await client.query(leaveRoomQuery, [u_id]);
 
-      if (!result.rows[0]) {
+      const getR_idQuery = `
+      select "r_id"
+      from "UserRoom"
+      where "u_id" = $1;`;
+      const getR_id = await client.query(getR_idQuery, [u_id]);
+
+      if (!getR_id.rows[0]) {
         console.log("This user not join room");
         socket.emit("roomError", { message: "joinRoom failed" });
         return;
       }
 
-      const r_id = result.rows[0].r_id;
-      const roomQuery = `
-      select * 
-      from "Room" 
-      where "r_id" = $1;`;
-      const room = await client.query(roomQuery, [r_id]);
+      const r_id = getR_id.rows[0].r_id;
 
-      if (!room.rows[0]) {
-        io.to(r_id).emit("roomUpdate", { room });
+      const userRoomQuery = `
+      update "UserRoom" 
+      set "r_id" = null 
+      where "u_id" = $1;`;
+      await client.query(userRoomQuery, [u_id]);
+
+      const leaveP1Query = `
+      update "Room" 
+      set "r_player1" = null 
+      where "r_player1" = $1;`
+      await client.query(leaveP1Query, [u_name]);
+
+      const leaveP2Query = `
+      update "Room" 
+      set "r_player2" = null 
+      where "r_player2" = $1;`
+      await client.query(leaveP2Query, [u_name]);
+
+      const roomQuery = `
+      update "Room" 
+      set "r_players" = "r_players" - 1
+      where "r_id" = $1
+      returning *;`;
+      const room = await client.query(roomQuery, [r_id]);
+      const roomData = room.rows[0];
+
+      if (roomData.r_players < 1) {
+        await client.query(`
+        delete from "Room" 
+        where "r_id" = $1;`, [r_id]);
+        console.log(`Remove room (${r_id})`);
+        return;
+      }
+
+      const p1Query = `
+      select *
+      from "User"
+      where u_name = $1;`;
+      const p1 = await client.query(p1Query, [roomData.r_player1]);
+
+      const p2Query = `
+      select *
+      from "User"
+      where u_name = $1;`;
+      const p2 = await client.query(p2Query, [roomData.r_player2]);
+
+      if (roomData) {
+        io.to(r_id).emit("roomUpdate", { room: roomData, p1: p1.rows[0], p2: p2.rows[0] });
         console.log(`Remove room (${r_id})`);
       }
 
@@ -677,6 +665,8 @@ io.on("connection", (socket) => {
 
       socket.leave(r_id);
       console.log(`left room (${r_id})`);
+
+      RefreshRoomList();
 
     } catch (err) {
       console.error("leaveRoom Error:", err);

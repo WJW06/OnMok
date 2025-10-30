@@ -60,9 +60,9 @@ const Room: React.FC = () => {
       } else {
         setPlayer2(player);
         if (is_join) {
-          setPlayer2State({ ...player1State, joined: true });
+          setPlayer2State({ ...player2State, joined: true });
         } else {
-          setPlayer2State({ ...player1State, joined: false });
+          setPlayer2State({ ...player2State, joined: false });
         }
       }
     })
@@ -71,9 +71,24 @@ const Room: React.FC = () => {
       console.error("Player error:", msg);
     });
 
-    socket.on("roomUpdate", ({ room }) => {
+    socket.on("roomUpdate", ({ room, p1, p2 }) => {
       console.log("Reload room state:", room);
       setRoomData(room);
+      setPlayer1(p1);
+      setPlayer2(p2);
+      if (p1) {
+        setPlayer1State({ ...player1State, joined: true });
+      } else {
+        setPlayer1State({ ...player1State, joined: false });
+      }
+
+      if (p2) {
+        setPlayer2State({ ...player2State, joined: true });
+      } else {
+        setPlayer2State({ ...player2State, joined: false });
+      }
+
+      console.log("r_id!:", room.r_id);
     });
 
     socket.on("roomError", (msg) => {
@@ -93,13 +108,13 @@ const Room: React.FC = () => {
 
     return () => {
       console.log("Room effect return");
+      socket.emit("leaveRoom");
       socket.off("playerUpdate");
       socket.off("playerError");
       socket.off("roomUpdate");
       socket.off("roomError");
       socket.off("loadChat");
       socket.off("newMessage");
-      socket.emit("leaveRoom");
     };
   }, []);
 
