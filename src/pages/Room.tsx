@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ReloadToken, socket } from "../socket";
 import { UserInfo } from "../pages/Home";
@@ -32,6 +32,7 @@ const Room: React.FC = () => {
   const [player2State, setPlayer2State] = useState({ joined: false, ready: false });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -45,7 +46,9 @@ const Room: React.FC = () => {
       console.log("Reconnect socket from Room.tsx");
       socket.connect();
     }
-    socket.emit("joinRoom");
+
+    const r_id = sessionStorage.getItem("currentRoom");
+    socket.emit("joinRoom", { r_id });
 
     socket.on("playerUpdate", ({ player, p_num, is_join }) => {
       console.log("Reload player state:", player);
@@ -107,16 +110,23 @@ const Room: React.FC = () => {
     });
 
     return () => {
-      console.log("Room effect return");
-      socket.emit("leaveRoom");
+      const r_id = sessionStorage.getItem("currentRoom");
+      socket.emit("leaveRoom", { r_id });
       socket.off("playerUpdate");
       socket.off("playerError");
       socket.off("roomUpdate");
       socket.off("roomError");
       socket.off("loadChat");
       socket.off("newMessage");
+      console.log("Room effect return");
     };
   }, []);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
   const handleExit = async () => {
     try {
@@ -126,13 +136,13 @@ const Room: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ r_id: roomData?.r_id }),
       });
 
       const data = await res.json();
       if (data.success) {
         localStorage.setItem("token", data.token);
         ReloadToken(data.token);
+        sessionStorage.removeItem("currentRoom");
       } else {
         alert(data.message || "Join room failed");
       }
@@ -149,6 +159,10 @@ const Room: React.FC = () => {
 
   const handlePlayerLeave = (pNum: number) => {
     socket.emit("playerLeave", { r_id: roomData?.r_id, p_num: pNum });
+  }
+
+  const handlePlayerReady = (pNum: number) => {
+
   }
 
   function SendMessage() {
@@ -189,7 +203,7 @@ const Room: React.FC = () => {
             </button>
             <button
               id="p1-ready" className="btn ready"
-              onClick={() => { }}
+              onClick={() => handlePlayerReady(1)}
               disabled={!player1State.joined}>
               Ready
             </button>
@@ -220,7 +234,7 @@ const Room: React.FC = () => {
             </button>
             <button
               id="p2-ready" className="btn ready"
-              onClick={() => { }}
+              onClick={() => handlePlayerReady(2)}
               disabled={!player2State.joined}>
               Ready
             </button>
@@ -240,6 +254,7 @@ const Room: React.FC = () => {
               </span>
             </div>
           ))}
+          <div ref={messagesEndRef}></div>
         </div>
 
         <div className="input-area">

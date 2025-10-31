@@ -26,7 +26,7 @@ function AuthMiddleware(req, res, next) {
 
 async function GetRoomsAndEmit(io, client) {
   try {
-    return RefreshRoomList();
+    return await RefreshRoomList();
 
   } catch (err) {
     console.error("GetRoomsAndEmit Error:", err);
@@ -49,13 +49,15 @@ async function GetRanking(client) {
   }
 }
 
-async function RefreshRoomList() {
+async function RefreshRoomList(socket = null) {
   try {
     const query = `
-      select * 
-      from "Room";`;
+    select * 
+    from "Room";`;
     const rooms = await client.query(query);
-    if (io) io.emit("roomListUpdate", rooms.rows);
+
+    if (socket) socket.emit("roomListUpdate", rooms.rows);
+    else io.emit("roomListUpdate", rooms.rows);
 
     return rooms.rows;
   } catch (err) {
@@ -396,16 +398,6 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
-  console.log("Connected:", socket.id);
-
-  socket.on("connect_error", (err) => {
-    console.error("Socket connection error:", err.message);
-    if (err.message === "Authentication error") {
-      alert("Login session end. Re-login please");
-      navigate("/Login");
-    }
-  });
-
   socket.on("createRoom", async () => {
     try {
       await GetRoomsAndEmit(io, client);
@@ -416,25 +408,11 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("joinRoom", async () => {
+  socket.on("joinRoom", async ({ r_id }) => {
+    const { u_name } = socket.data.datas;
+
     try {
-      const { u_id, u_name } = socket.data.datas;
-
-      const getR_idQuery = `
-      select "r_id"
-      from "UserRoom"
-      where "u_id" = $1;`;
-      const getR_id = await client.query(getR_idQuery, [u_id]);
-
-      if (!getR_id.rows[0]) {
-        console.log("This user not join room");
-        socket.emit("roomError", { message: "joinRoom failed" });
-        return;
-      }
-
-      const r_id = getR_id.rows[0].r_id;
       socket.join(r_id);
-
       const roomQuery = `
       update "Room" 
       set "r_players" = "r_players" + 1
@@ -461,7 +439,7 @@ io.on("connection", (socket) => {
         roomInfo: roomData,
       });
 
-      RefreshRoomList();
+      await RefreshRoomList(null);
 
       const chatQuery = `
       select "c_sender", "c_text", "c_created"
@@ -558,9 +536,9 @@ io.on("connection", (socket) => {
   });
 
   socket.on("sendMessage", async ({ r_id, message }) => {
-    try {
-      const { u_name } = socket.data.datas;
+    const { u_name } = socket.data.datas;
 
+    try {
       const insertQuery = `
       insert into "Chat" ("r_id", "c_sender", "c_text")
       values ($1, $2, $3);`;
@@ -591,24 +569,10 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("leaveRoom", async () => {
+  socket.on("leaveRoom", async ({ r_id }) => {
+    const { u_id, u_name } = socket.data.datas;
+
     try {
-      const { u_id, u_name } = socket.data.datas;
-
-      const getR_idQuery = `
-      select "r_id"
-      from "UserRoom"
-      where "u_id" = $1;`;
-      const getR_id = await client.query(getR_idQuery, [u_id]);
-
-      if (!getR_id.rows[0]) {
-        console.log("This user not join room");
-        socket.emit("roomError", { message: "joinRoom failed" });
-        return;
-      }
-
-      const r_id = getR_id.rows[0].r_id;
-
       const userRoomQuery = `
       update "UserRoom" 
       set "r_id" = null 
@@ -634,6 +598,8 @@ io.on("connection", (socket) => {
       returning *;`;
       const room = await client.query(roomQuery, [r_id]);
       const roomData = room.rows[0];
+      console.log("r_players:", roomData.r_players);
+
 
       if (roomData.r_players < 1) {
         await client.query(`
@@ -656,8 +622,8 @@ io.on("connection", (socket) => {
       const p2 = await client.query(p2Query, [roomData.r_player2]);
 
       if (roomData) {
+        console.log("Room Data:", roomData);
         io.to(r_id).emit("roomUpdate", { room: roomData, p1: p1.rows[0], p2: p2.rows[0] });
-        console.log(`Remove room (${r_id})`);
       }
 
       // 추후에 추가
@@ -666,15 +632,15 @@ io.on("connection", (socket) => {
       socket.leave(r_id);
       console.log(`left room (${r_id})`);
 
-      RefreshRoomList();
+      await RefreshRoomList(null);
 
     } catch (err) {
       console.error("leaveRoom Error:", err);
     }
   });
 
-  socket.on("disconnect", () => {
-    console.log("Disconnected:", socket.id);
+  socket.on("refreshRoomList", async () => {
+    await RefreshRoomList(socket);
   });
 });
 

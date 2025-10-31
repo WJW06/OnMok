@@ -30,6 +30,7 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchUser = async () => {
       const token = localStorage.getItem("token");
+      console.log("RT:", token);
       if (!token) {
         alert("Wrong token!");
         console.log("Wrong token!");
@@ -37,7 +38,6 @@ const Home: React.FC = () => {
         return;
       }
       ReloadToken(token);
-      socket.connect();
 
       const res = await fetch("http://localhost:5000/GetUserInfo", {
         headers: {
@@ -119,6 +119,7 @@ const Home: React.FC = () => {
     if (data.success) {
       localStorage.setItem("token", data.token);
       ReloadToken(data.token);
+      sessionStorage.setItem("currentRoom", room.r_id);
       navigate(`/room/${room.r_id}`);
     } else {
       alert(data.message || "Join room failed");
@@ -200,6 +201,10 @@ const Home: React.FC = () => {
     }
   }
 
+  const handleRefresh = () => {
+    socket.emit("refreshRoomList");
+  }
+
   if (!user) return <p>Loading...</p>;
 
   return (
@@ -252,7 +257,7 @@ const Home: React.FC = () => {
               className="search-input"
               onChange={(e) => { SearchRoom(String(e.target.value)) }}
             />
-            <button className="refresh-btn">🔄</button>
+            <button className="refresh-btn" onClick={handleRefresh}>🔄</button>
           </div>
         </div>
 

@@ -22,9 +22,16 @@ const Login: React.FC = () => {
         });
 
         const data = await res.json();
+        console.log("Login response:", data);
         if (data.success) {
-            localStorage.setItem("token", data.token);
-            ReloadToken(data.token);
+            if (!data.token) {
+                console.error("Server did not return a valid token:", data);
+                return;
+            }
+
+            const newToken = String(data.token);
+            localStorage.setItem("token", newToken);
+            ReloadToken(newToken);
             navigate('/Home');
         }
         else {
