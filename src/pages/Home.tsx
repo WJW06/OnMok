@@ -30,7 +30,6 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchUser = async () => {
       const token = localStorage.getItem("token");
-      console.log("RT:", token);
       if (!token) {
         alert("Wrong token!");
         console.log("Wrong token!");
@@ -53,7 +52,6 @@ const Home: React.FC = () => {
       }
 
       const data = await res.json();
-
       if (data.success) {
         setUser(data.user);
       } else {
@@ -118,8 +116,8 @@ const Home: React.FC = () => {
     const data = await res.json();
     if (data.success) {
       localStorage.setItem("token", data.token);
-      ReloadToken(data.token);
       sessionStorage.setItem("currentRoom", room.r_id);
+      ReloadToken(data.token);
       navigate(`/room/${room.r_id}`);
     } else {
       alert(data.message || "Join room failed");

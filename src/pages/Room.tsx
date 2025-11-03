@@ -35,20 +35,19 @@ const Room: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!token) {
+    console.log(token);
+    if (!token || !token.includes(".")) {
       alert("Wrong token!");
       console.log("Wrong token!");
       navigate("/home");
       return;
     }
 
+    socket.auth = { token: token };
     if (!socket.connected) {
-      console.log("Reconnect socket from Room.tsx");
+      console.log("Reconnect socket from Room");
       socket.connect();
     }
-
-    const r_id = sessionStorage.getItem("currentRoom");
-    socket.emit("joinRoom", { r_id });
 
     socket.on("playerUpdate", ({ player, p_num, is_join }) => {
       console.log("Reload player state:", player);
@@ -95,18 +94,18 @@ const Room: React.FC = () => {
     });
 
     socket.on("roomError", (msg) => {
-      console.error("Room error:", msg);
       alert(msg.message);
+      console.error("Room error:", msg);
     });
 
     socket.on("loadChat", (history: ChatMessage[]) => {
-      console.log("loadChat:", history);
       setMessages(history);
+      console.log("loadChat:", history);
     });
 
     socket.on("newMessage", (message: ChatMessage) => {
-      console.log("newMessage:", message);
       setMessages((prev) => [...prev, message]);
+      console.log("newMessage:", message);
     });
 
     return () => {
@@ -118,6 +117,7 @@ const Room: React.FC = () => {
       socket.off("roomError");
       socket.off("loadChat");
       socket.off("newMessage");
+      sessionStorage.removeItem("currentRoom");
       console.log("Room effect return");
     };
   }, []);
@@ -142,7 +142,6 @@ const Room: React.FC = () => {
       if (data.success) {
         localStorage.setItem("token", data.token);
         ReloadToken(data.token);
-        sessionStorage.removeItem("currentRoom");
       } else {
         alert(data.message || "Join room failed");
       }

@@ -32,9 +32,9 @@ export function ReloadToken(token: string | null) {
 }
 
 socket.on("connect", () => {
-    console.log("Connected:", socket.id)
     const r_id = sessionStorage.getItem("currentRoom");
     if (r_id) socket.emit("joinRoom", { r_id });
+    console.log("Connected:", socket.id)
 });
 
 socket.on("connect_error", (err) => {
@@ -45,4 +45,6 @@ socket.on("connect_error", (err) => {
     }
 });
 
-socket.on("disconnect", () => console.log("Disconnected:", socket.id));
+socket.on("disconnect", () => {
+    console.log("Disconnected:", socket.id);
+});

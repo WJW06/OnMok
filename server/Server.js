@@ -317,12 +317,6 @@ app.post("/JoinRoom", AuthMiddleware, async (req, res) => {
   }
 
   try {
-    const userRoomQuery = `
-    update "UserRoom" 
-    set "r_id" = $1 
-    where "u_id" = $2;`;
-    await client.query(userRoomQuery, [r_id, u_id]);
-
     const { exp, ...userRest } = req.user;
     const token = jwt.sign(
       { ...userRest },
@@ -409,17 +403,36 @@ io.on("connection", (socket) => {
   });
 
   socket.on("joinRoom", async ({ r_id }) => {
-    const { u_name } = socket.data.datas;
+    const { u_id, u_name } = socket.data.datas;
 
     try {
       socket.join(r_id);
       const roomQuery = `
+      select *
+      from "Room"
+      where "r_id" = $1;`;
+      const room = await client.query(roomQuery, [r_id]);
+      const roomData = room.rows[0];
+
+      const playersQuery = `
       update "Room" 
       set "r_players" = "r_players" + 1
       where "r_id" = $1
+      and exists(
+        select *
+        from "UserRoom"
+        where "u_id" = $2
+        and "r_id" is distinct from $1)
       returning *;`;
-      const room = await client.query(roomQuery, [r_id]);
-      const roomData = room.rows[0];
+      const players = await client.query(playersQuery, [r_id, u_id]);
+
+      if (players.rows) {
+        const userRoomQuery = `
+        update "UserRoom" 
+        set "r_id" = $1 
+        where "u_id" = $2;`;
+        await client.query(userRoomQuery, [r_id, u_id]);
+      }
 
       const p1Query = `
       select *
@@ -598,8 +611,6 @@ io.on("connection", (socket) => {
       returning *;`;
       const room = await client.query(roomQuery, [r_id]);
       const roomData = room.rows[0];
-      console.log("r_players:", roomData.r_players);
-
 
       if (roomData.r_players < 1) {
         await client.query(`
@@ -622,7 +633,6 @@ io.on("connection", (socket) => {
       const p2 = await client.query(p2Query, [roomData.r_player2]);
 
       if (roomData) {
-        console.log("Room Data:", roomData);
         io.to(r_id).emit("roomUpdate", { room: roomData, p1: p1.rows[0], p2: p2.rows[0] });
       }
 
