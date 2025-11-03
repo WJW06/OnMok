@@ -15,7 +15,7 @@ export default function Router() {
     useEffect(() => {
         const checkTokenExpiration = () => {
             const token = localStorage.getItem("token");
-            const isLoginPage = location.pathname === "/Login";
+            const isLoginPage = location.pathname === "/Login" || location.pathname === "/Sign_up";
 
             if (isLoginPage) {
                 if (token && token.includes(".")) {

@@ -24,16 +24,6 @@ function AuthMiddleware(req, res, next) {
   }
 }
 
-async function GetRoomsAndEmit(io, client) {
-  try {
-    return await RefreshRoomList();
-
-  } catch (err) {
-    console.error("GetRoomsAndEmit Error:", err);
-    throw err;
-  }
-}
-
 async function GetRanking(client) {
   try {
     const rankingQuery = `
@@ -76,8 +66,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  // port: 5432, /* 집 */
-  port: 5433, /* 회사 */
+  port: 5432, /* 집 */
+  // port: 5433, /* 회사 */
 });
 client.connect();
 
@@ -122,7 +112,7 @@ app.get("/GetUserInfo", AuthMiddleware, async (req, res) => {
 
 app.get("/GetRoomsInfo", async (req, res) => {
   try {
-    const rooms = await GetRoomsAndEmit(null, client);
+    const rooms = await RefreshRoomList();
 
     res.json({ success: true, rooms: rooms });
 
@@ -276,7 +266,7 @@ app.post("/SearchRoom", async (req, res) => {
   const { text } = req.body;
 
   if (text === '') {
-    const rooms = await getRoomsAndEmit(null, client);
+    const rooms = await RefreshRoomList();
     return res.json({ success: true, rooms: rooms });
   }
 
@@ -394,7 +384,7 @@ io.use((socket, next) => {
 io.on("connection", (socket) => {
   socket.on("createRoom", async () => {
     try {
-      await GetRoomsAndEmit(io, client);
+      await RefreshRoomList();
 
     } catch (err) {
       console.error("createRoom Error:", err);
@@ -446,7 +436,11 @@ io.on("connection", (socket) => {
       where u_name = $1;`;
       const p2 = await client.query(p2Query, [roomData.r_player2]);
 
-      io.to(r_id).emit("roomUpdate", { room: roomData, p1: p1.rows[0], p2: p2.rows[0] });
+      io.to(r_id).emit("roomUpdate", { 
+      room: roomData, p1: p1.rows[0], p2: p2.rows[0],
+      p1_ready: roomData.r_p1Ready, p2_ready: roomData.r_p2Ready
+      });
+
       socket.emit("joinRoomSuccess", {
         message: `${u_name} joined`,
         roomInfo: roomData,
@@ -507,7 +501,7 @@ io.on("connection", (socket) => {
       where u_name = $1;`;
       const player = await client.query(playerQuery, [u_name]);
 
-      io.to(r_id).emit("playerUpdate", { player: player.rows[0], p_num: p_num, is_join: true });
+      io.to(r_id).emit("playerUpdate", { player: player.rows[0], p_num: p_num, is_join: true, is_ready: false });
 
     } catch (err) {
       console.error("playerJoin Error:", err);
@@ -539,7 +533,46 @@ io.on("connection", (socket) => {
       const result = await client.query(playerLeaveQuery, [r_id, u_name]);
 
       if (result.rows[0]) {
-        io.to(r_id).emit("playerUpdate", { player: null, p_num: p_num, is_join: false });
+        io.to(r_id).emit("playerUpdate", { player: null, p_num: p_num, is_join: false, is_ready: false });
+      }
+
+    } catch (err) {
+      console.error("playerLeave Error:", err);
+      socket.emit("playerError", { message: "playerLeave failed" });
+    }
+  });
+
+  socket.on("playerReady", async ({ r_id, p_num, is_ready }) => {
+    const { u_name } = socket.data.datas;
+
+    if (!r_id) {
+      return res.status(400).json({ success: false, message: "No room provided" });
+    }
+
+    try {
+      const playerReadyQuery = p_num === 1
+        ? `
+      update "Room"
+      set "r_p1Ready" = $1
+      where "r_id" = $2
+      and "r_player1" = $3
+      returning *;`
+        : `
+      update "Room"
+      set "r_p2Ready" = $1
+      where "r_id" = $2
+      and "r_player2" = $3
+      returning *`;
+      const result = await client.query(playerReadyQuery, [is_ready, r_id, u_name]);
+
+      if (result.rows[0]) {
+        const playerQuery = `
+        select *
+        from "User"
+        where "u_name" = $1;`;
+        const player = await client.query(playerQuery, [u_name]);
+
+        io.to(r_id).emit("playerUpdate", { player: player.rows[0], p_num: p_num, is_join: true, is_ready: is_ready });
       }
 
     } catch (err) {
@@ -588,19 +621,21 @@ io.on("connection", (socket) => {
     try {
       const userRoomQuery = `
       update "UserRoom" 
-      set "r_id" = null 
+      set "r_id" = null
       where "u_id" = $1;`;
       await client.query(userRoomQuery, [u_id]);
 
       const leaveP1Query = `
-      update "Room" 
-      set "r_player1" = null 
+      update "Room"
+      set "r_player1" = null
+      and "r_p1Ready" = false
       where "r_player1" = $1;`
       await client.query(leaveP1Query, [u_name]);
 
       const leaveP2Query = `
-      update "Room" 
-      set "r_player2" = null 
+      update "Room"
+      set "r_player2" = null
+      and "r_p2Ready" = false
       where "r_player2" = $1;`
       await client.query(leaveP2Query, [u_name]);
 
@@ -617,6 +652,7 @@ io.on("connection", (socket) => {
         delete from "Room" 
         where "r_id" = $1;`, [r_id]);
         console.log(`Remove room (${r_id})`);
+        RefreshRoomList();
         return;
       }
 
@@ -633,7 +669,10 @@ io.on("connection", (socket) => {
       const p2 = await client.query(p2Query, [roomData.r_player2]);
 
       if (roomData) {
-        io.to(r_id).emit("roomUpdate", { room: roomData, p1: p1.rows[0], p2: p2.rows[0] });
+        io.to(r_id).emit("roomUpdate", { 
+        room: roomData, p1: p1.rows[0], p2: p2.rows[0],
+        p1_ready: roomData.r_p1Ready, p2_ready: roomData.r_p2Ready
+      });;
       }
 
       // 추후에 추가

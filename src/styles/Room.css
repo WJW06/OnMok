@@ -98,6 +98,16 @@
     filter: brightness(0.9);
 }
 
+.btn.ready.active {
+  background: #2196f3;
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .chat-box {
     border-top: 2px solid #000;
     margin-top: 20px;

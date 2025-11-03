@@ -49,23 +49,15 @@ const Room: React.FC = () => {
       socket.connect();
     }
 
-    socket.on("playerUpdate", ({ player, p_num, is_join }) => {
+    socket.on("playerUpdate", ({ player, p_num, is_join, is_ready }) => {
       console.log("Reload player state:", player);
 
       if (p_num === 1) {
         setPlayer1(player);
-        if (is_join) {
-          setPlayer1State({ ...player1State, joined: true });
-        } else {
-          setPlayer1State({ ...player1State, joined: false });
-        }
+        setPlayer1State({ joined: is_join, ready: is_ready });
       } else {
         setPlayer2(player);
-        if (is_join) {
-          setPlayer2State({ ...player2State, joined: true });
-        } else {
-          setPlayer2State({ ...player2State, joined: false });
-        }
+        setPlayer2State({ joined: is_join, ready: is_ready });
       }
     })
 
@@ -73,22 +65,13 @@ const Room: React.FC = () => {
       console.error("Player error:", msg);
     });
 
-    socket.on("roomUpdate", ({ room, p1, p2 }) => {
+    socket.on("roomUpdate", ({ room, p1, p2, p1_ready, p2_ready }) => {
       console.log("Reload room state:", room);
       setRoomData(room);
       setPlayer1(p1);
       setPlayer2(p2);
-      if (p1) {
-        setPlayer1State({ ...player1State, joined: true });
-      } else {
-        setPlayer1State({ ...player1State, joined: false });
-      }
-
-      if (p2) {
-        setPlayer2State({ ...player2State, joined: true });
-      } else {
-        setPlayer2State({ ...player2State, joined: false });
-      }
+      setPlayer1State({ joined: p1 != null, ready: p1_ready });
+      setPlayer2State({ joined: p2 != null, ready: p2_ready });
 
       console.log("r_id!:", room.r_id);
     });
@@ -160,8 +143,8 @@ const Room: React.FC = () => {
     socket.emit("playerLeave", { r_id: roomData?.r_id, p_num: pNum });
   }
 
-  const handlePlayerReady = (pNum: number) => {
-
+  const handlePlayerReady = (pNum: number, isReady: boolean) => {
+    socket.emit("playerReady", { r_id: roomData?.r_id, p_num: pNum, is_ready: isReady });
   }
 
   function SendMessage() {
@@ -187,11 +170,12 @@ const Room: React.FC = () => {
             {player1?.u_lose} lose <> </>
             {player1?.u_draw} draw
           </p>
+
           <div className="buttons">
             <button
               id="p1-leave" className="btn leave"
               onClick={() => handlePlayerLeave(1)}
-              disabled={!player1State.joined}>
+              disabled={!player1State.joined || player1State.ready}>
               leave
             </button>
             <button
@@ -201,8 +185,9 @@ const Room: React.FC = () => {
               join
             </button>
             <button
-              id="p1-ready" className="btn ready"
-              onClick={() => handlePlayerReady(1)}
+              id="p1-ready"
+              className={`btn ready ${player1State.ready ? "active" : ""}`}
+              onClick={() => handlePlayerReady(1, !player1State.ready)}
               disabled={!player1State.joined}>
               Ready
             </button>
@@ -222,7 +207,7 @@ const Room: React.FC = () => {
             <button
               id="p2-leave" className="btn leave"
               onClick={() => handlePlayerLeave(2)}
-              disabled={!player2State.joined}>
+              disabled={!player2State.joined || player2State.ready}>
               leave
             </button>
             <button
@@ -232,8 +217,9 @@ const Room: React.FC = () => {
               join
             </button>
             <button
-              id="p2-ready" className="btn ready"
-              onClick={() => handlePlayerReady(2)}
+              id="p2-ready"
+              className={`btn ready ${player2State.ready ? "active" : ""}`}
+              onClick={() => handlePlayerReady(2, !player2State.ready)}
               disabled={!player2State.joined}>
               Ready
             </button>
