@@ -6,7 +6,6 @@ import Sign from './pages/Sign_up';
 import Home from './pages/Home';
 import Room from './pages/Room';
 import Ranking from './pages/Ranking';
-import Ground from './components/Ground';
 
 export default function Router() {
     const navigate = useNavigate();
@@ -76,7 +75,6 @@ export default function Router() {
             <Route path="/Home" element={<Home />} />
             <Route path="/room/:r_id" element={<Room />} />
             <Route path="/Ranking" element={<Ranking />} />
-            <Route path="/Ground" element={<Ground />} />
         </Routes>
     );
 }

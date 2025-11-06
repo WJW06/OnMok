@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ReloadToken, socket } from "../socket";
 import { UserInfo } from "../pages/Home";
+import { motion, AnimatePresence } from "framer-motion";
+import Board from '../components/Board';
+
 import "../styles/Room.css";
 
 export interface RoomInfo {
@@ -33,6 +36,8 @@ const Room: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [roomState, setRoomState] = useState<string>("VS");
+  const [started, setStarted] = useState(false);
 
   useEffect(() => {
     console.log(token);
@@ -91,15 +96,33 @@ const Room: React.FC = () => {
       console.log("newMessage:", message);
     });
 
+    socket.on("countdown", ({ seconds }) => {
+      setRoomState(seconds);
+    });
+
+    socket.on("cancleCountdown", () => {
+      console.log("Countdown canceled.");
+      setRoomState("VS");
+    })
+
+    socket.on("started", () => {
+        setRoomState("VS");
+        setStarted(true);
+        socket.emit("startGame", {r_id: roomData?.r_id});
+    });
+
     return () => {
       const r_id = sessionStorage.getItem("currentRoom");
       socket.emit("leaveRoom", { r_id });
-      socket.off("playerUpdate");
-      socket.off("playerError");
-      socket.off("roomUpdate");
-      socket.off("roomError");
+      socket.off("startGame");
+      socket.off("cancleCountdown");
+      socket.off("countdown");
       socket.off("loadChat");
       socket.off("newMessage");
+      socket.off("playerError");
+      socket.off("playerUpdate");
+      socket.off("roomError");
+      socket.off("roomUpdate");
       sessionStorage.removeItem("currentRoom");
       console.log("Room effect return");
     };
@@ -156,104 +179,126 @@ const Room: React.FC = () => {
   };
 
   return (
-    <div className="room-container">
-      <div className="room-header">
-        <h1 className="room-name">{roomData?.r_name}</h1>
-        <button className="close-btn" onClick={handleExit}>✖</button>
-      </div>
-
-      <div className="players">
-        <div className="player">
-          <h2>{player1?.u_name}</h2>
-          <p className="record">
-            {player1?.u_win} win <> </>
-            {player1?.u_lose} lose <> </>
-            {player1?.u_draw} draw
-          </p>
-
-          <div className="buttons">
-            <button
-              id="p1-leave" className="btn leave"
-              onClick={() => handlePlayerLeave(1)}
-              disabled={!player1State.joined || player1State.ready}>
-              leave
-            </button>
-            <button
-              id="p1-join" className="btn join"
-              onClick={() => handlePlayerJoin(1)}
-              disabled={player1State.joined}>
-              join
-            </button>
-            <button
-              id="p1-ready"
-              className={`btn ready ${player1State.ready ? "active" : ""}`}
-              onClick={() => handlePlayerReady(1, !player1State.ready)}
-              disabled={!player1State.joined}>
-              Ready
-            </button>
-          </div>
-        </div>
-
-        <h2 className="vs">VS</h2>
-
-        <div className="player">
-          <h2>{player2?.u_name}</h2>
-          <p className="record">
-            {player2?.u_win} win <> </>
-            {player2?.u_lose} lose <> </>
-            {player2?.u_draw} draw
-          </p>
-          <div className="buttons">
-            <button
-              id="p2-leave" className="btn leave"
-              onClick={() => handlePlayerLeave(2)}
-              disabled={!player2State.joined || player2State.ready}>
-              leave
-            </button>
-            <button
-              id="p2-join" className="btn join"
-              onClick={() => handlePlayerJoin(2)}
-              disabled={player2State.joined}>
-              join
-            </button>
-            <button
-              id="p2-ready"
-              className={`btn ready ${player2State.ready ? "active" : ""}`}
-              onClick={() => handlePlayerReady(2, !player2State.ready)}
-              disabled={!player2State.joined}>
-              Ready
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="chat-box">
-        <div className="messages">
-          {messages.map((message, idx) => (
-            <div key={idx} className="chat-line">
-              <div>
-                <strong>{message.c_sender}</strong>: {message.c_text}
-              </div>
-              <span className="chat-time">
-                {new Date(message.c_created).toLocaleTimeString()}
-              </span>
+    <AnimatePresence>
+    {!started && (
+      <motion.div
+        key="room"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}>{
+          <div className="room-container">
+            <div className="room-header">
+              <h1 className="room-name">{roomData?.r_name}</h1>
+              <button className="close-btn" onClick={handleExit}>✖</button>
             </div>
-          ))}
-          <div ref={messagesEndRef}></div>
-        </div>
 
-        <div className="input-area">
-          <input
-            value={input}
-            type="text"
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && SendMessage()}
-            placeholder="(Input message.)"
-          />
-          <button className="send-btn" onClick={SendMessage}>➤</button>
-        </div>
-      </div>
-    </div>
+            <div className="players">
+              <div className="player">
+                <h2>{player1?.u_name}</h2>
+                <p className="record">
+                  {player1?.u_win} win <> </>
+                  {player1?.u_lose} lose <> </>
+                  {player1?.u_draw} draw
+                </p>
+
+                <div className="buttons">
+                  <button
+                    id="p1-leave" className="btn leave"
+                    onClick={() => handlePlayerLeave(1)}
+                    disabled={!player1State.joined || player1State.ready}>
+                    leave
+                  </button>
+                  <button
+                    id="p1-join" className="btn join"
+                    onClick={() => handlePlayerJoin(1)}
+                    disabled={player1State.joined}>
+                    join
+                  </button>
+                  <button
+                    id="p1-ready"
+                    className={`btn ready ${player1State.ready ? "active" : ""}`}
+                    onClick={() => handlePlayerReady(1, !player1State.ready)}
+                    disabled={!player1State.joined}>
+                    Ready
+                  </button>
+                </div>
+              </div>
+
+              <h2 className={`room-state ${roomState !== "VS" ? "counting" : ""}`}>
+                {roomState}
+              </h2>
+
+              <div className="player">
+                <h2>{player2?.u_name}</h2>
+                <p className="record">
+                  {player2?.u_win} win <> </>
+                  {player2?.u_lose} lose <> </>
+                  {player2?.u_draw} draw
+                </p>
+                <div className="buttons">
+                  <button
+                    id="p2-leave" className="btn leave"
+                    onClick={() => handlePlayerLeave(2)}
+                    disabled={!player2State.joined || player2State.ready}>
+                    leave
+                  </button>
+                  <button
+                    id="p2-join" className="btn join"
+                    onClick={() => handlePlayerJoin(2)}
+                    disabled={player2State.joined}>
+                    join
+                  </button>
+                  <button
+                    id="p2-ready"
+                    className={`btn ready ${player2State.ready ? "active" : ""}`}
+                    onClick={() => handlePlayerReady(2, !player2State.ready)}
+                    disabled={!player2State.joined}>
+                    Ready
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="chat-box">
+              <div className="messages">
+                {messages.map((message, idx) => (
+                  <div key={idx} className="chat-line">
+                    <div>
+                      <strong>{message.c_sender}</strong>: {message.c_text}
+                    </div>
+                    <span className="chat-time">
+                      {new Date(message.c_created).toLocaleTimeString()}
+                    </span>
+                  </div>
+                ))}
+                <div ref={messagesEndRef}></div>
+              </div>
+
+              <div className="input-area">
+                <input
+                  value={input}
+                  type="text" 
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && SendMessage()}
+                  placeholder="(Input message.)"
+                />
+                <button className="send-btn" onClick={SendMessage}>➤</button>
+              </div>
+            </div>
+          </div>}
+      </motion.div>
+    )}
+
+    {started && (
+      <motion.div
+        key="board"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}>
+        <Board />
+      </motion.div>
+    )}
+    </AnimatePresence>
   );
 }
 

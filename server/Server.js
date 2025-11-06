@@ -56,6 +56,81 @@ async function RefreshRoomList(socket = null) {
   }
 }
 
+const countdowns = new Map();
+
+async function CheckReadys(socket, r_id) {
+  try{
+    const checkReadyQuery = `
+    select "r_p1Ready", "r_p2Ready"
+    from "Room"
+    where "r_id" = $1;`;
+    const checkReady = await client.query(checkReadyQuery, [r_id]);
+    const { r_p1Ready, r_p2Ready } = checkReady.rows[0];
+
+    if (r_p1Ready && r_p2Ready) {
+      if (countdowns.has(r_id)) {
+        console.log(`Countdown for ${r_id} already running`);
+        return;
+      }
+
+      let remaining = 4;
+      const countdownInterval = setInterval(() => {
+        if (remaining-- > 1) {
+          io.to(r_id).emit("countdown", { seconds: remaining });
+        } else {
+          clearInterval(countdownInterval);
+          io.to(r_id).emit("started", { message: "Game started!" });
+          countdowns.delete(r_id);
+        }
+      }, 1000);
+
+      countdowns.set(r_id, { countdownInterval });
+    }
+
+  } catch (err){
+    console.error("checkReadys Error:", err);
+    socket.emit("readysError", { message: "checkReadys failed" });
+  }
+}
+
+async function CancleReady(r_id, p_num, u_name, is_join){
+  try{
+    if (countdowns.has(r_id)) {
+      const countdown = countdowns.get(r_id);
+      clearInterval(countdown.countdownInterval);
+      countdowns.delete(r_id);
+      console.log(`Countdown for room ${r_id} canceled (player left).`);
+      io.to(r_id).emit("cancleCountdown");
+    }
+    
+    if (is_join){
+      const playerColumn = p_num === 1 ?  "r_player1" : "r_player2";
+      const readyColumn = p_num === 1 ? "r_p1Ready" : "r_p2Ready";
+      const cancleReadyQuery = `
+      update "Room"
+      set "${readyColumn}" = false
+      where "r_id" = $1
+      and "${playerColumn}" = $2
+      returning *;`;
+      const result = await client.query(cancleReadyQuery, [r_id, u_name]);
+      
+      const playerQuery = `
+      select *
+      from "User"
+      where "u_name" = $1;`;
+      const player = await client.query(playerQuery, [u_name]);
+      
+      if (result.rows[0]) {
+        io.to(r_id).emit("playerUpdate", { player: player.rows[0], p_num: p_num, is_join: is_join, is_ready: false });
+      }
+    }
+
+  } catch (err){
+    console.error("cancleReady Error:", err);
+    socket.emit("cancleError", { message: "cancleReady failed" });
+  }
+}
+
 
 const app = express();
 app.use(cors({ origin: "http://localhost:4000", credentials: true }));
@@ -382,6 +457,10 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
+  socket.on("refreshRoomList", async () => {
+    await RefreshRoomList(socket);
+  });
+
   socket.on("createRoom", async () => {
     try {
       await RefreshRoomList();
@@ -427,13 +506,13 @@ io.on("connection", (socket) => {
       const p1Query = `
       select *
       from "User"
-      where u_name = $1;`;
+      where "u_name" = $1;`;
       const p1 = await client.query(p1Query, [roomData.r_player1]);
 
       const p2Query = `
       select *
       from "User"
-      where u_name = $1;`;
+      where "u_name" = $1;`;
       const p2 = await client.query(p2Query, [roomData.r_player2]);
 
       io.to(r_id).emit("roomUpdate", { 
@@ -473,20 +552,15 @@ io.on("connection", (socket) => {
     }
 
     try {
-      const playerJoinQuery = p_num === 1
-        ? `
+      const playerColumn = p_num === 1 ? "r_player1" : "r_player2";
+      const enemyCoumn = p_num !== 1 ? "r_player1" : "r_player2";
+
+      const playerJoinQuery = `
       update "Room"
-      set "r_player1" = $1
+      set "${playerColumn}" = $1
       where "r_id" = $2
-      and "r_player1" is null
-      and ("r_player2" != $3 or "r_player2" is null)
-      returning *;`
-        : `
-      update "Room"
-      set "r_player2" = $1
-      where "r_id" = $2
-      and "r_player2" is null
-      and ("r_player1" != $3 or "r_player1" is null)
+      and "${playerColumn}" is null
+      and ("${enemyCoumn}" != $3 or "${enemyCoumn}" is null)
       returning *;`;
       const result = await client.query(playerJoinQuery, [u_name, r_id, u_name]);
 
@@ -517,24 +591,7 @@ io.on("connection", (socket) => {
     }
 
     try {
-      const playerLeaveQuery = p_num === 1
-        ? `
-      update "Room"
-      set "r_player1" = null
-      where "r_id" = $1
-      and "r_player1" = $2
-      returning *;`
-        : `
-      update "Room"
-      set "r_player2" = null
-      where "r_id" = $1
-      and "r_player2" = $2
-      returning *;`;
-      const result = await client.query(playerLeaveQuery, [r_id, u_name]);
-
-      if (result.rows[0]) {
-        io.to(r_id).emit("playerUpdate", { player: null, p_num: p_num, is_join: false, is_ready: false });
-      }
+      CancleReady(r_id, p_num, u_name, false);
 
     } catch (err) {
       console.error("playerLeave Error:", err);
@@ -550,19 +607,15 @@ io.on("connection", (socket) => {
     }
 
     try {
-      const playerReadyQuery = p_num === 1
-        ? `
+      const playerColumn = p_num === 1 ?  "r_player1" : "r_player2";
+      const readyColumn = p_num === 1 ?  "r_p1Ready" : "r_p2Ready";
+
+      const playerReadyQuery = `
       update "Room"
-      set "r_p1Ready" = $1
+      set "${readyColumn}" = $1
       where "r_id" = $2
-      and "r_player1" = $3
-      returning *;`
-        : `
-      update "Room"
-      set "r_p2Ready" = $1
-      where "r_id" = $2
-      and "r_player2" = $3
-      returning *`;
+      and "${playerColumn}"  = $3
+      returning *;`;
       const result = await client.query(playerReadyQuery, [is_ready, r_id, u_name]);
 
       if (result.rows[0]) {
@@ -573,6 +626,9 @@ io.on("connection", (socket) => {
         const player = await client.query(playerQuery, [u_name]);
 
         io.to(r_id).emit("playerUpdate", { player: player.rows[0], p_num: p_num, is_join: true, is_ready: is_ready });
+
+        if (is_ready) CheckReadys(socket, r_id);
+        else CancleReady(r_id, p_num, u_name, true);
       }
 
     } catch (err) {
@@ -627,17 +683,22 @@ io.on("connection", (socket) => {
 
       const leaveP1Query = `
       update "Room"
-      set "r_player1" = null
-      and "r_p1Ready" = false
-      where "r_player1" = $1;`
-      await client.query(leaveP1Query, [u_name]);
-
+      set "r_player1" = null,
+          "r_p1Ready" = false
+      where "r_id" = $1
+      and "r_player1" = $2;`
+      await client.query(leaveP1Query, [r_id, u_name]);
+      
       const leaveP2Query = `
       update "Room"
-      set "r_player2" = null
-      and "r_p2Ready" = false
-      where "r_player2" = $1;`
-      await client.query(leaveP2Query, [u_name]);
+      set "r_player2" = null,
+          "r_p2Ready" = false
+      where "r_id" = $1
+      and "r_player2" = $2;`
+      await client.query(leaveP2Query, [r_id, u_name]);
+
+      CancleReady(r_id, 1, u_name, false);
+      CancleReady(r_id, 2, u_name, false);
 
       const roomQuery = `
       update "Room" 
@@ -688,8 +749,17 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("refreshRoomList", async () => {
-    await RefreshRoomList(socket);
+  socket.on("startGame", async ({r_id}) =>{
+    try{
+      const startedQuery = `
+      update "Room"
+      set "r_started" = true
+      where "r_id" = $1;`;
+      await client.query(startedQuery, [r_id]);
+      
+    } catch (err){
+      console.error("startGame Error:", err);
+    }
   });
 });
 
