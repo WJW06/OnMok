@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { socket } from "../socket";
 import '../styles/Ground.css';
 import '../styles/Ground-responsive.css';
 
@@ -6,23 +7,45 @@ import '../styles/Ground-responsive.css';
 const rcCount: number = 18;
 
 const Board: React.FC = () => {
-  useEffect(() => {
-    fetch("http://localhost:5000/Ground")
-      .then((res) => res.json())
-      .then((data) => { console.log(data) })
-  });
-
-
   // [Game-state variables]
   const [zones, setZones] = useState<string[]>(Array<string>(rcCount * rcCount).fill(""));
-  let isPlaying = useRef(false);
-  let turn = useRef(0);
+  const r_id = useRef<string | null>(null);
+  const player1 = useRef<string | null>(null);
+  const player2 = useRef<string | null>(null);
   let selectZone = useRef(-1);
+  let isPlaying = useRef(true);
+  let turn = useRef(0);
   let player1Zones = useRef(Array<boolean>(rcCount * rcCount).fill(false));
   let player1Count = useRef(0);
   let player2Zones = useRef(Array<boolean>(rcCount * rcCount).fill(false));
   let player2Count = useRef(0);
-  let isGameEnd = useRef(false);
+
+  useEffect(() => {
+    fetch("http://localhost:5000/Ground")
+      .then((res) => res.json())
+      .then((data) => { console.log(data) })
+
+    socket.on("makeBoard", ({ b_player1, b_player2 }) => {
+      const session_r_id = sessionStorage.getItem("currentRoom");
+      r_id.current = session_r_id;
+      player1.current = b_player1;
+      player2.current = b_player2;
+    });
+
+    return () => {
+      OutGame();
+      socket.off("makeBoard");
+    }
+  }, []);
+
+  // [Server part]
+  function OutGame() {
+    if (r_id.current) {
+      const url = "http://localhost:4000/OutGame";
+      const body = JSON.stringify({ r_id: r_id.current });
+      navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));
+    }
+  }
 
   // [Make UI part]
   type MakeRowProps = {
@@ -66,12 +89,12 @@ const Board: React.FC = () => {
   }
 
   // {UI part}
-  function StartButton() {
+  function GoRoomButton() {
     if (isPlaying.current) return <></>;
 
     return (
       <button className='start-button' onClick={StartGame}>
-        Start Game
+        Go Room
       </button>
     );
   }
@@ -133,7 +156,6 @@ const Board: React.FC = () => {
     isPlaying.current = false;
     player1Count.current = 0;
     player2Count.current = 0;
-    isGameEnd.current = false;
 
     console.log("[InitGameState Start]")
     console.log("isPlaying: " + isPlaying);
@@ -143,12 +165,11 @@ const Board: React.FC = () => {
     console.log("player1Count: " + player1Count);
     console.log("player2Zones: " + player2Zones);
     console.log("player2Count: " + player2Count);
-    console.log("isGameEnd: " + isGameEnd);
     console.log("[InitGameState End]")
   }
 
   function SelectZone(index: number) {
-    if (isPlaying.current === false || zones[index] || isGameEnd.current || index === -1) return;
+    if (isPlaying.current === false || zones[index] || index === -1) return;
     const nextZones = zones.slice(); // copy
     nextZones[index] = turn.current % 2 === 0 ? "●" : "○";
     setZones(nextZones);
@@ -296,7 +317,6 @@ const Board: React.FC = () => {
         console.log("startButton none");
         startButton.style.display = 'none';
       }
-      isGameEnd.current = true;
 
       if (winner === 1) {
         alert("Winner: Player1!");
@@ -305,6 +325,8 @@ const Board: React.FC = () => {
       if (winner === 2) {
         alert("Winner: Player2!");
       }
+
+      isPlaying.current = false;
     }
   }
 
@@ -313,7 +335,7 @@ const Board: React.FC = () => {
     <>
       <div className='ui-ground'>
         <MakeTurnText></MakeTurnText>
-        <StartButton></StartButton>
+        <GoRoomButton></GoRoomButton>
         <ResetButton></ResetButton>
       </div>
 

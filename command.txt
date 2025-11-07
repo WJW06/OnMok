@@ -57,9 +57,9 @@ create table "Room"(
 "r_isLocked" boolean,
 "r_players" integer,
 "r_maxPlayers" integer,
-"r_roomMaster" varchar(40) references "User" ("u_name"),
-"r_player1" varchar(40) references "User" ("u_name") default null,
-"r_player2" varchar(40) references "User" ("u_name") default null,
+"r_roomMaster" varchar(40) references "User"("u_name"),
+"r_player1" varchar(40) references "User"("u_name") default null,
+"r_player2" varchar(40) references "User"("u_name") default null,
 "r_p1Ready" boolean default false,
 "r_p2Ready" boolean default false,
 "r_started" boolean default false,
@@ -70,6 +70,17 @@ insert into "Room" values(11111111, 'Test_Room', 1234, true, 2, 8, 'Master', nul
 insert into "Room" values(22222222, 'Room_Test', 4321, false, 4, 16, null, null, null, false, false, false, 300, false);
 
 delete from "Room";
+
+drop table "UserRoom";
+
+create table "UserRoom"(
+"u_id" varchar(20) primary key references "User"("u_id"),  
+"r_id" varchar(8) references "Room"("r_id")
+);
+insert into "UserRoom" values('', null);
+insert into "UserRoom" values('1', null);
+
+delete from "UserRoom";
 
 drop table "Chat";
 
@@ -83,16 +94,18 @@ create table "Chat"(
 
 delete from "Chat";
 
-drop table "UserRoom";
+drop table "Board";
 
-create table "UserRoom"(
-"u_id" varchar(20) primary key references "User" ("u_id"),  
-"r_id" varchar(8) references "Room"("r_id")
+create table "Board"(
+"r_id" varchar(8) primary key references "Room"("r_id"),
+"b_player1" varchar(40) references "User"("u_name"),
+"b_player2" varchar(40) references "User"("u_name"),
+"b_selectZone" integer default -1,
+"b_isPlaying" boolean default true,
+"b_turn" integer default 0,
+"b_isUndo" boolean,
+"b_prevSelectZone" integer default -1
 );
-insert into "UserRoom" values('', null);
-insert into "UserRoom" values('1', null);
-
-delete from "UserRoom";
 
 c_id integer forgin
 ================================================================================

@@ -59,7 +59,7 @@ async function RefreshRoomList(socket = null) {
 const countdowns = new Map();
 
 async function CheckReadys(socket, r_id) {
-  try{
+  try {
     const checkReadyQuery = `
     select "r_p1Ready", "r_p2Ready"
     from "Room"
@@ -87,14 +87,14 @@ async function CheckReadys(socket, r_id) {
       countdowns.set(r_id, { countdownInterval });
     }
 
-  } catch (err){
+  } catch (err) {
     console.error("checkReadys Error:", err);
     socket.emit("readysError", { message: "checkReadys failed" });
   }
 }
 
-async function CancleReady(r_id, p_num, u_name, is_join){
-  try{
+async function CancleReady(r_id, p_num, u_name, is_join) {
+  try {
     if (countdowns.has(r_id)) {
       const countdown = countdowns.get(r_id);
       clearInterval(countdown.countdownInterval);
@@ -102,9 +102,9 @@ async function CancleReady(r_id, p_num, u_name, is_join){
       console.log(`Countdown for room ${r_id} canceled (player left).`);
       io.to(r_id).emit("cancleCountdown");
     }
-    
-    if (is_join){
-      const playerColumn = p_num === 1 ?  "r_player1" : "r_player2";
+
+    if (is_join) {
+      const playerColumn = p_num === 1 ? "r_player1" : "r_player2";
       const readyColumn = p_num === 1 ? "r_p1Ready" : "r_p2Ready";
       const cancleReadyQuery = `
       update "Room"
@@ -113,19 +113,19 @@ async function CancleReady(r_id, p_num, u_name, is_join){
       and "${playerColumn}" = $2
       returning *;`;
       const result = await client.query(cancleReadyQuery, [r_id, u_name]);
-      
+
       const playerQuery = `
       select *
       from "User"
       where "u_name" = $1;`;
       const player = await client.query(playerQuery, [u_name]);
-      
+
       if (result.rows[0]) {
         io.to(r_id).emit("playerUpdate", { player: player.rows[0], p_num: p_num, is_join: is_join, is_ready: false });
       }
     }
 
-  } catch (err){
+  } catch (err) {
     console.error("cancleReady Error:", err);
     socket.emit("cancleError", { message: "cancleReady failed" });
   }
@@ -141,8 +141,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  port: 5432, /* 집 */
-  // port: 5433, /* 회사 */
+  // port: 5432, /* 집 */
+  port: 5433, /* 회사 */
 });
 client.connect();
 
@@ -414,6 +414,14 @@ app.post("/LeaveRoom", AuthMiddleware, async (req, res) => {
   }
 });
 
+app.post('/OutGame', express.json(), async (req, res) => {
+  const { r_id } = req.body;
+  if (!r_id) return res.status(400).send('No r_id');
+
+  io.to(r_id).emit("endedGame");
+  res.status(200).send('ok');
+});
+
 /* Socket.io */
 
 const server = http.createServer(app);
@@ -515,9 +523,9 @@ io.on("connection", (socket) => {
       where "u_name" = $1;`;
       const p2 = await client.query(p2Query, [roomData.r_player2]);
 
-      io.to(r_id).emit("roomUpdate", { 
-      room: roomData, p1: p1.rows[0], p2: p2.rows[0],
-      p1_ready: roomData.r_p1Ready, p2_ready: roomData.r_p2Ready
+      io.to(r_id).emit("roomUpdate", {
+        room: roomData, p1: p1.rows[0], p2: p2.rows[0],
+        p1_ready: roomData.r_p1Ready, p2_ready: roomData.r_p2Ready
       });
 
       socket.emit("joinRoomSuccess", {
@@ -607,8 +615,8 @@ io.on("connection", (socket) => {
     }
 
     try {
-      const playerColumn = p_num === 1 ?  "r_player1" : "r_player2";
-      const readyColumn = p_num === 1 ?  "r_p1Ready" : "r_p2Ready";
+      const playerColumn = p_num === 1 ? "r_player1" : "r_player2";
+      const readyColumn = p_num === 1 ? "r_p1Ready" : "r_p2Ready";
 
       const playerReadyQuery = `
       update "Room"
@@ -688,7 +696,7 @@ io.on("connection", (socket) => {
       where "r_id" = $1
       and "r_player1" = $2;`
       await client.query(leaveP1Query, [r_id, u_name]);
-      
+
       const leaveP2Query = `
       update "Room"
       set "r_player2" = null,
@@ -730,10 +738,10 @@ io.on("connection", (socket) => {
       const p2 = await client.query(p2Query, [roomData.r_player2]);
 
       if (roomData) {
-        io.to(r_id).emit("roomUpdate", { 
-        room: roomData, p1: p1.rows[0], p2: p2.rows[0],
-        p1_ready: roomData.r_p1Ready, p2_ready: roomData.r_p2Ready
-      });;
+        io.to(r_id).emit("roomUpdate", {
+          room: roomData, p1: p1.rows[0], p2: p2.rows[0],
+          p1_ready: roomData.r_p1Ready, p2_ready: roomData.r_p2Ready
+        });;
       }
 
       // 추후에 추가
@@ -749,16 +757,68 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("startGame", async ({r_id}) =>{
-    try{
+  socket.on("startGame", async ({ r_id }) => {
+    try {
+      const roomQuery = `
+      select "r_started", "r_player1", "r_player2", "r_isUndo"
+      from "Room"
+      where "r_id" = $1;`;
+      const room = await client.query(roomQuery, [r_id]);
+      const { r_started, r_player1, r_player2, r_isUndo } = room.rows[0];
+
+      if (r_started === true) {
+        console.log("Already started room.");
+        return;
+      }
+      console.log(room.rows[0]);
+
       const startedQuery = `
       update "Room"
       set "r_started" = true
       where "r_id" = $1;`;
       await client.query(startedQuery, [r_id]);
-      
-    } catch (err){
+
+      const createBoardQuery = `
+      insert into "Board"("r_id", "b_player1", "b_player2", "b_isUndo")
+      values($1, $2, $3, $4);`;
+      await client.query(createBoardQuery, [r_id, r_player1, r_player2, r_isUndo]);
+
+      io.to(r_id).emit("makeBoard", { b_player1: r_player1, b_player2: r_player2 });
+
+    } catch (err) {
       console.error("startGame Error:", err);
+    }
+  });
+
+  socket.on("endedGame", async ({ r_id, u_name }) => {
+    try {
+      console.log("EEEEEEnd");
+
+      const roomQuery = `
+      select "r_started"
+      from "Room"
+      where "r_id" = $1;`;
+      const room = await client.query(roomQuery, [r_id]);
+      const { r_started } = room.rows[0];
+
+      if (r_started === false) {
+        console.log("Already ended room.");
+        return;
+      }
+
+      const endedQuery = `
+      update "Room"
+      set "r_started" = false
+      where "r_id" = $1;`;
+      await client.query(endedQuery, [r_id]);
+
+      const deleteRoomQuery = `
+      delete from "Board"
+      where "r_id" = $1;`;
+      await client.query(deleteRoomQuery, [r_id]);
+
+    } catch (err) {
+      console.error("endGame Error:", err);
     }
   });
 });
