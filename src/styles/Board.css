@@ -24,7 +24,7 @@ button {
 
 
 /* [UI part css] */
-.ui-ground {
+.ui-board {
   margin-top: 18px;
   margin-left: 14%;
 }
@@ -53,30 +53,4 @@ button {
   margin-top: 338px;
   font-size: 20pt;
   font-weight: 700;
-}
-
-
-/* [Chat part css] */
-.chat-ground {
-  margin-left: 5%;
-}
-
-.chats-div {
-  width: 80%;
-  height: 250px;
-  border: 3px solid black;
-  margin: 20px;
-  font-size: 12pt;
-}
-
-.chat-input {
-  width: 60%;
-  height: 38px;
-  border: 2px solid black;
-  font-size: 18pt;
-}
-
-.nickname {
-  font-weight: 600;
-  font-size: 15pt;
 }

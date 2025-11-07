@@ -19,7 +19,7 @@ export interface RoomInfo {
   r_isUndo: boolean;
 }
 
-interface ChatMessage {
+export interface ChatMessage {
   c_sender: string;
   c_text: string;
   c_created: string;
@@ -107,14 +107,18 @@ const Room: React.FC = () => {
     socket.on("started", () => {
       setRoomState("VS");
       setStarted(true);
-      const r_id = sessionStorage.getItem("currentRoom");
-      socket.emit("startGame", { r_id: r_id });
+    });
+
+    socket.on("ended", () => {
+      setStarted(false);
     });
 
     return () => {
       const r_id = sessionStorage.getItem("currentRoom");
+      OutGame(r_id);
       socket.emit("leaveRoom", { r_id });
-      socket.off("startGame");
+      socket.off("ended");
+      socket.off("started");
       socket.off("cancleCountdown");
       socket.off("countdown");
       socket.off("loadChat");
@@ -177,6 +181,14 @@ const Room: React.FC = () => {
     console.log("sended message is", input);
     setInput("");
   };
+
+  function OutGame(r_id: string | null) {
+    if (r_id) {
+      const url = "http://localhost:5000/OutGame";
+      const body = JSON.stringify({ r_id: r_id, token: localStorage.getItem('token') });
+      navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -259,7 +271,7 @@ const Room: React.FC = () => {
                 </div>
               </div>
 
-              <div className="chat-box">
+              <div className= "chat-box">
                 <div className="messages">
                   {messages.map((message, idx) => (
                     <div key={idx} className="chat-line">
@@ -296,6 +308,32 @@ const Room: React.FC = () => {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}>
           <Board />
+            <div className= "chat-box">
+              <div className="messages">
+                {messages.map((message, idx) => (
+                  <div key={idx} className="chat-line">
+                    <div>
+                      <strong>{message.c_sender}</strong>: {message.c_text}
+                    </div>
+                    <span className="chat-time">
+                      {new Date(message.c_created).toLocaleTimeString()}
+                    </span>
+                  </div>
+                ))}
+                <div ref={messagesEndRef}></div>
+              </div>
+
+              <div className="input-area">
+                <input
+                  value={input}
+                  type="text"
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && SendMessage()}
+                  placeholder="(Input message.)"
+                />
+                <button className="send-btn" onClick={SendMessage}>➤</button>
+              </div>
+            </div>
         </motion.div>
       )}
     </AnimatePresence>

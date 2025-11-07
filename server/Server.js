@@ -74,13 +74,15 @@ async function CheckReadys(socket, r_id) {
       }
 
       let remaining = 4;
-      const countdownInterval = setInterval(() => {
+      const countdownInterval = setInterval(async () => {
         if (remaining-- > 1) {
           io.to(r_id).emit("countdown", { seconds: remaining });
         } else {
           clearInterval(countdownInterval);
-          io.to(r_id).emit("started", { message: "Game started!" });
           countdowns.delete(r_id);
+          
+          await StartGame(r_id);
+          io.to(r_id).emit("started", { message: "Game started!" });
         }
       }, 1000);
 
@@ -131,6 +133,81 @@ async function CancleReady(r_id, p_num, u_name, is_join) {
   }
 }
 
+async function StartGame(r_id){
+  try {
+      const roomQuery = `
+      select "r_player1", "r_player2", "r_started", "r_isUndo"
+      from "Room"
+      where "r_id" = $1;`;
+      const room = await client.query(roomQuery, [r_id]);
+      const { r_player1, r_player2, r_started, r_isUndo } = room.rows[0];
+
+      console.log("Start Room:", room.rows[0]);
+      if (r_started === true) {
+        console.log("Already started room.");
+        return;
+      }
+
+      const startedQuery = `
+      update "Room"
+      set "r_started" = true
+      where "r_id" = $1;`;
+      await client.query(startedQuery, [r_id]);
+
+      try {
+        const createBoardQuery = `
+        insert into "Board"("r_id", "b_player1", "b_player2", "b_isUndo")
+        values($1, $2, $3, $4);`;
+        await client.query(createBoardQuery, [r_id, r_player1, r_player2, r_isUndo]); 
+        io.to(r_id).emit("makeBoard", { b_player1: r_player1, b_player2: r_player2 });
+        console.log(`Board created for room ${r_id}`);
+
+      } catch (err){
+        if (err.code === "23505") {
+          console.log(`Board for ${r_id} already exists`);
+        } else {
+          throw err;
+        }
+      }
+
+    } catch (err) {
+      console.error("startGame Error:", err);
+    }
+}
+
+async function EndGame(r_id, u_name) {
+  try {
+    console.log("Out user is:", u_name);
+
+    const roomQuery = `
+    select "r_started"
+    from "Room"
+    where "r_id" = $1;`;
+    const room = await client.query(roomQuery, [r_id]);
+    const { r_started } = room.rows[0];
+
+    if (!room.rows || r_started === false) {
+      console.log("Already ended room.");
+      return false;
+    }
+
+    const endedQuery = `
+    update "Room"
+    set "r_started" = false
+    where "r_id" = $1;`;
+    await client.query(endedQuery, [r_id]);
+
+    const deleteRoomQuery = `
+    delete from "Board"
+    where "r_id" = $1;`;
+    await client.query(deleteRoomQuery, [r_id]);
+    return true;
+
+  } catch (err) {
+    console.error("endGame Error:", err);
+    throw err;
+  }
+}
 
 const app = express();
 app.use(cors({ origin: "http://localhost:4000", credentials: true }));
@@ -141,8 +218,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  // port: 5432, /* 집 */
-  port: 5433, /* 회사 */
+  port: 5432, /* 집 */
+  // port: 5433, /* 회사 */
 });
 client.connect();
 
@@ -375,7 +452,6 @@ app.post("/SearchRoom", async (req, res) => {
 
 app.post("/JoinRoom", AuthMiddleware, async (req, res) => {
   const { r_id } = req.body;
-  const { u_id } = req.user;
 
   if (!r_id) {
     return res.status(400).json({ success: false, message: "No room provided" });
@@ -414,12 +490,29 @@ app.post("/LeaveRoom", AuthMiddleware, async (req, res) => {
   }
 });
 
-app.post('/OutGame', express.json(), async (req, res) => {
-  const { r_id } = req.body;
+app.post('/OutGame', async (req, res) => {
+  const { r_id, token } = req.body;
+
   if (!r_id) return res.status(400).send('No r_id');
 
-  io.to(r_id).emit("endedGame");
-  res.status(200).send('ok');
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, SECRET_KEY);
+      req.user = decoded;
+
+    } catch (err) {
+      res.status(401).json({ success: false, message: "Invalid token" });
+    }
+  }
+
+  try{
+    const result = await EndGame(r_id, req.user?.u_name);
+    io.to(r_id).emit("ended");
+    res.status(200).send('ok');
+    
+  } catch{
+    res.status(500).send('server error');
+  }
 });
 
 /* Socket.io */
@@ -754,71 +847,6 @@ io.on("connection", (socket) => {
 
     } catch (err) {
       console.error("leaveRoom Error:", err);
-    }
-  });
-
-  socket.on("startGame", async ({ r_id }) => {
-    try {
-      const roomQuery = `
-      select "r_started", "r_player1", "r_player2", "r_isUndo"
-      from "Room"
-      where "r_id" = $1;`;
-      const room = await client.query(roomQuery, [r_id]);
-      const { r_started, r_player1, r_player2, r_isUndo } = room.rows[0];
-
-      if (r_started === true) {
-        console.log("Already started room.");
-        return;
-      }
-      console.log(room.rows[0]);
-
-      const startedQuery = `
-      update "Room"
-      set "r_started" = true
-      where "r_id" = $1;`;
-      await client.query(startedQuery, [r_id]);
-
-      const createBoardQuery = `
-      insert into "Board"("r_id", "b_player1", "b_player2", "b_isUndo")
-      values($1, $2, $3, $4);`;
-      await client.query(createBoardQuery, [r_id, r_player1, r_player2, r_isUndo]);
-
-      io.to(r_id).emit("makeBoard", { b_player1: r_player1, b_player2: r_player2 });
-
-    } catch (err) {
-      console.error("startGame Error:", err);
-    }
-  });
-
-  socket.on("endedGame", async ({ r_id, u_name }) => {
-    try {
-      console.log("EEEEEEnd");
-
-      const roomQuery = `
-      select "r_started"
-      from "Room"
-      where "r_id" = $1;`;
-      const room = await client.query(roomQuery, [r_id]);
-      const { r_started } = room.rows[0];
-
-      if (r_started === false) {
-        console.log("Already ended room.");
-        return;
-      }
-
-      const endedQuery = `
-      update "Room"
-      set "r_started" = false
-      where "r_id" = $1;`;
-      await client.query(endedQuery, [r_id]);
-
-      const deleteRoomQuery = `
-      delete from "Board"
-      where "r_id" = $1;`;
-      await client.query(deleteRoomQuery, [r_id]);
-
-    } catch (err) {
-      console.error("endGame Error:", err);
     }
   });
 });

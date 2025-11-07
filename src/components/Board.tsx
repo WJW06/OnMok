@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { socket } from "../socket";
-import '../styles/Ground.css';
-import '../styles/Ground-responsive.css';
+import '../styles/Board.css';
+import '../styles/Board-responsive.css';
 
 // [Game setting (*Don't touch*)]
 const rcCount: number = 18;
@@ -19,7 +19,6 @@ const Board: React.FC = () => {
   let player1Count = useRef(0);
   let player2Zones = useRef(Array<boolean>(rcCount * rcCount).fill(false));
   let player2Count = useRef(0);
-
   useEffect(() => {
     fetch("http://localhost:5000/Ground")
       .then((res) => res.json())
@@ -32,20 +31,15 @@ const Board: React.FC = () => {
       player2.current = b_player2;
     });
 
+
     return () => {
-      OutGame();
       socket.off("makeBoard");
     }
   }, []);
 
   // [Server part]
-  function OutGame() {
-    if (r_id.current) {
-      const url = "http://localhost:4000/OutGame";
-      const body = JSON.stringify({ r_id: r_id.current });
-      navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));
-    }
-  }
+
+
 
   // [Make UI part]
   type MakeRowProps = {
@@ -107,23 +101,6 @@ const Board: React.FC = () => {
     console.log(isPlaying.current);
     if (isPlaying.current) return <span className='turn-text' style={{ display: 'block' }}>turn: {turn.current + 1}</span>
     else return <span className='turn-text' style={{ display: 'none' }}>turn: {turn.current + 1}</span>
-  }
-
-  // {Chat part}
-  function MakeChatWindow() {
-    return (
-      <div className='chats-div'>
-
-      </div>
-    );
-  }
-
-  function MakeChatInput() {
-    return (
-      <>
-        <span className='nickname'>닉네임: </span><input className='chat-input'></input>
-      </>
-    );
   }
 
 
@@ -333,7 +310,7 @@ const Board: React.FC = () => {
   // [main loop]
   return (
     <>
-      <div className='ui-ground'>
+      <div className='ui-board'>
         <MakeTurnText></MakeTurnText>
         <GoRoomButton></GoRoomButton>
         <ResetButton></ResetButton>
@@ -358,11 +335,6 @@ const Board: React.FC = () => {
         <MakeRowZones offset={15}></MakeRowZones>
         <MakeRowZones offset={16}></MakeRowZones>
         <MakeRowZones offset={17}></MakeRowZones>
-      </div>
-
-      <div className='chat-ground'>
-        <MakeChatWindow></MakeChatWindow>
-        <MakeChatInput></MakeChatInput>
       </div>
     </>
   );
