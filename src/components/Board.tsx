@@ -31,6 +31,10 @@ const Board: React.FC = () => {
       player2.current = b_player2;
     });
 
+    socket.on("placeZone", ({b_zones, index}) => {
+      SelectZone(index);
+      setZones(b_zones);
+    });
 
     return () => {
       socket.off("makeBoard");
@@ -38,7 +42,9 @@ const Board: React.FC = () => {
   }, []);
 
   // [Server part]
-
+  const handleSelectZone = (index: number) => {
+    socket.emit("selectZone", { r_id: r_id.current, turn: turn.current, index: index });
+  }
 
 
   // [Make UI part]
@@ -79,7 +85,7 @@ const Board: React.FC = () => {
   }
 
   function MakeZone({ index }: MakeZoneProps) {
-    return <button className='zone' onClick={() => SelectZone(index)}>{zones[index]}</button>;
+    return <button className='zone' onClick={() => handleSelectZone(index)}>{zones[index]}</button>;
   }
 
   // {UI part}
@@ -146,7 +152,7 @@ const Board: React.FC = () => {
   }
 
   function SelectZone(index: number) {
-    if (isPlaying.current === false || zones[index] || index === -1) return;
+    if (isPlaying.current === false || zones[index] !== "" || index === -1) return;
     const nextZones = zones.slice(); // copy
     nextZones[index] = turn.current % 2 === 0 ? "●" : "○";
     setZones(nextZones);

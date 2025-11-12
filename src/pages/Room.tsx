@@ -93,6 +93,7 @@ const Room: React.FC = () => {
     socket.on("newMessage", (message: ChatMessage) => {
       setMessages((prev) => [...prev, message]);
       console.log("newMessage:", message);
+      console.log("Currnet messages:",messages);
     });
 
     socket.on("countdown", ({ seconds }) => {
@@ -107,6 +108,8 @@ const Room: React.FC = () => {
     socket.on("started", () => {
       setRoomState("VS");
       setStarted(true);
+      const r_id = sessionStorage.getItem("currentRoom");
+      socket.emit("successStart", {r_id: r_id});
     });
 
     socket.on("ended", () => {
@@ -134,6 +137,7 @@ const Room: React.FC = () => {
 
   useEffect(() => {
     if (messagesEndRef.current) {
+      console.log("Smoooooooth");
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
@@ -306,34 +310,38 @@ const Room: React.FC = () => {
           key="board"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}>
-          <Board />
-            <div className= "chat-box">
-              <div className="messages">
-                {messages.map((message, idx) => (
-                  <div key={idx} className="chat-line">
-                    <div>
-                      <strong>{message.c_sender}</strong>: {message.c_text}
+          exit={{ opacity: 0 }}>{
+            <>
+              <Board />
+              
+              <div className= "chat-box">
+                <div className="messages">
+                  {messages.map((message, idx) => (
+                    <div key={idx} className="chat-line">
+                      <div>
+                        <strong>{message.c_sender}</strong>: {message.c_text}
+                      </div>
+                      <span className="chat-time">
+                        {new Date(message.c_created).toLocaleTimeString()}
+                      </span>
                     </div>
-                    <span className="chat-time">
-                      {new Date(message.c_created).toLocaleTimeString()}
-                    </span>
-                  </div>
-                ))}
-                <div ref={messagesEndRef}></div>
-              </div>
+                  ))}
+                  <div ref={messagesEndRef}></div>
+                </div>
 
-              <div className="input-area">
-                <input
-                  value={input}
-                  type="text"
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && SendMessage()}
-                  placeholder="(Input message.)"
-                />
-                <button className="send-btn" onClick={SendMessage}>➤</button>
+                <div className="input-area">
+                  <input
+                    value={input}
+                    type="text"
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && SendMessage()}
+                    placeholder="(Input message.)"
+                  />
+                  <button className="send-btn" onClick={SendMessage}>➤</button>
+                </div>
               </div>
-            </div>
+            </>
+          }
         </motion.div>
       )}
     </AnimatePresence>

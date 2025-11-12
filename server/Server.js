@@ -159,7 +159,6 @@ async function StartGame(r_id){
         insert into "Board"("r_id", "b_player1", "b_player2", "b_isUndo")
         values($1, $2, $3, $4);`;
         await client.query(createBoardQuery, [r_id, r_player1, r_player2, r_isUndo]); 
-        io.to(r_id).emit("makeBoard", { b_player1: r_player1, b_player2: r_player2 });
         console.log(`Board created for room ${r_id}`);
 
       } catch (err){
@@ -380,13 +379,16 @@ app.post("/CreateRoom", async (req, res) => {
 
   try {
     const roomQuery = `
-    insert into "Room" 
-    values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+    insert into "Room"
+    ("r_id", "r_name", "r_password",
+     "r_isLocked", "r_players", "r_maxPlayers",
+     "r_roomMaster", "r_turnTime", "r_isUndo")
+    values($1, $2, $3, $4, $5, $6, $7, $8, $9) 
     returning *`;
     const values = [
       roomData.r_id, roomData.r_name, roomData.r_password, roomData.r_isLocked,
       roomData.r_players, roomData.r_maxPlayers, roomData.r_roomMaster,
-      roomData.r_player1, roomData.r_player2, roomData.r_turnTime, roomData.r_isUndo];
+      roomData.r_turnTime, roomData.r_isUndo];
     await client.query(roomQuery, values);
 
     res.json({ success: true, message: "Success sign up!" });
@@ -571,7 +573,7 @@ io.on("connection", (socket) => {
       socket.emit("roomError", { message: "Create room faild!" });
     }
   });
-
+  
   socket.on("joinRoom", async ({ r_id }) => {
     const { u_id, u_name } = socket.data.datas;
 
@@ -692,7 +694,18 @@ io.on("connection", (socket) => {
     }
 
     try {
-      CancleReady(r_id, p_num, u_name, false);
+      const playerColumn = p_num === 1 ?  "r_player1" : "r_player2";
+      const playerLeaveQuery = `
+      update "Room"
+      set ${playerColumn} = null
+      where "r_id" = $1
+      and ${playerColumn} = $2
+      returning *;`;
+      const result = await client.query(playerLeaveQuery, [r_id, u_name]);
+
+      if (result.rows[0]) {
+        io.to(r_id).emit("playerUpdate", { player: null, p_num: p_num, is_join: false, is_ready: false });
+      }
 
     } catch (err) {
       console.error("playerLeave Error:", err);
@@ -735,6 +748,54 @@ io.on("connection", (socket) => {
     } catch (err) {
       console.error("playerLeave Error:", err);
       socket.emit("playerError", { message: "playerLeave failed" });
+    }
+  });
+
+  socket.on("successStart", async ({r_id})=>{
+    try{
+      const roomQuery = `
+      select "r_player1", "r_player2"
+      from "Room"
+      where "r_id" = $1;`;
+      const room = await client.query(roomQuery, [r_id]);
+      const { r_player1, r_player2 } = room.rows[0];
+
+      io.to(r_id).emit("makeBoard", { b_player1: r_player1, b_player2: r_player2 });
+
+    } catch (err){
+      console.error("successStart Error:", err);
+    }
+  });
+
+  socket.on("selectZone", async ({r_id, turn, index})=>{
+    try{
+      const checkZoneQuery = `
+      select ("b_zones"::jsonb)-> $1 as zone
+      from "Board"
+      where "r_id" = $2`;
+      const result = await client.query(checkZoneQuery, [index, r_id]);
+      const zone = result.rows[0].zone;
+      console.log("zones state:", zone);
+      if (zone !== null) {
+        console.log("already place zone!");
+        return;
+      }
+
+      const playerColumn = turn % 2 === 0 ? '●': '○';
+      const zonesQuery = `
+      update "Board"
+      set "b_zones" = jsonb_set("b_zones", $1, $2::jsonb),
+          "b_undoList" = "b_undoList" || to_jsonb($3::int)
+      where "r_id" = $4
+      returning *;`;
+      const values = [`{${index}}`, JSON.stringify(playerColumn), index, r_id];
+      const zones = await client.query(zonesQuery, values);
+
+      io.to(r_id).emit("placeZone", {b_zones: zones.rows[0].b_zones, index: index});
+
+    } catch (err){
+      console.error("selectZone Error:", err);
+      socket.emit("selectError", { message: "selectZone failed" });
     }
   });
 
