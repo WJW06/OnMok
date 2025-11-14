@@ -24,11 +24,13 @@ const Board: React.FC = () => {
       .then((res) => res.json())
       .then((data) => { console.log(data) })
 
-    socket.on("makeBoard", ({ b_player1, b_player2 }) => {
+    socket.on("makeBoard", ({ b_player1, b_player2, zonesState, turnState }) => {
       const session_r_id = sessionStorage.getItem("currentRoom");
       r_id.current = session_r_id;
       player1.current = b_player1;
       player2.current = b_player2;
+      setZones(zonesState);
+      turn.current = turnState;
     });
 
     socket.on("placeZone", ({b_zones, index}) => {
@@ -97,10 +99,6 @@ const Board: React.FC = () => {
         Go Room
       </button>
     );
-  }
-
-  function ResetButton() {
-    return <button className='reset-button' onClick={() => { if (isPlaying.current) InitGameState(); }}>Reset Game</button>;
   }
 
   function MakeTurnText() {
@@ -319,7 +317,6 @@ const Board: React.FC = () => {
       <div className='ui-board'>
         <MakeTurnText></MakeTurnText>
         <GoRoomButton></GoRoomButton>
-        <ResetButton></ResetButton>
       </div>
 
       <div className='board-ground'>

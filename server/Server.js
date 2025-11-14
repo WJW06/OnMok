@@ -106,8 +106,8 @@ async function CancleReady(r_id, p_num, u_name, is_join) {
     }
 
     if (is_join) {
-      const playerColumn = p_num === 1 ? "r_player1" : "r_player2";
       const readyColumn = p_num === 1 ? "r_p1Ready" : "r_p2Ready";
+      const playerColumn = p_num === 1 ? "r_player1" : "r_player2";
       const cancleReadyQuery = `
       update "Room"
       set "${readyColumn}" = false
@@ -176,25 +176,19 @@ async function StartGame(r_id){
 
 async function EndGame(r_id, u_name) {
   try {
-    console.log("Out user is:", u_name);
-
     const roomQuery = `
-    select "r_started"
-    from "Room"
-    where "r_id" = $1;`;
-    const room = await client.query(roomQuery, [r_id]);
-    const { r_started } = room.rows[0];
-
-    if (!room.rows || r_started === false) {
-      console.log("Already ended room.");
-      return false;
-    }
-
-    const endedQuery = `
     update "Room"
     set "r_started" = false
-    where "r_id" = $1;`;
-    await client.query(endedQuery, [r_id]);
+    where "r_id" = $1
+    and ("r_player1" is null
+          or "r_player2" is null)
+    returning *;`;
+    const room = await client.query(roomQuery, [r_id]);
+    
+    if (room.rowCount === 0) {
+      console.log("You can't end the room.");
+      return false;
+    }
 
     const deleteRoomQuery = `
     delete from "Board"
@@ -307,7 +301,7 @@ app.post("/Login", async (req, res) => {
     where "u_id" = $1;`;
     const result = await client.query(userQuery, [u_id]);
 
-    if (result.rows.length === 0) {
+    if (result.rowCount === 0) {
       return res.status(401).json({ success: false, message: "This ID does not exist." });
     }
 
@@ -509,7 +503,7 @@ app.post('/OutGame', async (req, res) => {
 
   try{
     const result = await EndGame(r_id, req.user?.u_name);
-    io.to(r_id).emit("ended");
+    if (result == true) io.to(r_id).emit("ended");
     res.status(200).send('ok');
     
   } catch{
@@ -629,6 +623,10 @@ io.on("connection", (socket) => {
       });
 
       await RefreshRoomList(null);
+
+      if (roomData.r_started){
+        io.to(r_id).emit("started", { message: "Game started!" });
+      }
 
       const chatQuery = `
       select "c_sender", "c_text", "c_created"
@@ -760,7 +758,17 @@ io.on("connection", (socket) => {
       const room = await client.query(roomQuery, [r_id]);
       const { r_player1, r_player2 } = room.rows[0];
 
-      io.to(r_id).emit("makeBoard", { b_player1: r_player1, b_player2: r_player2 });
+      const zonesQuery = `
+      select "b_zones", "b_turn"
+      from "Board"
+      where "r_id" = $1;`
+      const zones = await client.query(zonesQuery, [r_id]);
+
+      io.to(r_id).emit("makeBoard", { 
+        b_player1: r_player1, b_player2: r_player2, 
+        zonesState: zones.rows[0].b_zones,
+        turnState: zones.rows[0].b_turn
+      });
 
     } catch (err){
       console.error("successStart Error:", err);
@@ -770,13 +778,13 @@ io.on("connection", (socket) => {
   socket.on("selectZone", async ({r_id, turn, index})=>{
     try{
       const checkZoneQuery = `
-      select ("b_zones"::jsonb)-> $1 as zone
+      select ("b_zones"::jsonb)-> ($1::int) as zone
       from "Board"
       where "r_id" = $2`;
       const result = await client.query(checkZoneQuery, [index, r_id]);
       const zone = result.rows[0].zone;
-      console.log("zones state:", zone);
-      if (zone !== null) {
+
+      if (zone !== '') {
         console.log("already place zone!");
         return;
       }
@@ -785,10 +793,11 @@ io.on("connection", (socket) => {
       const zonesQuery = `
       update "Board"
       set "b_zones" = jsonb_set("b_zones", $1, $2::jsonb),
-          "b_undoList" = "b_undoList" || to_jsonb($3::int)
-      where "r_id" = $4
+          "b_undoList" = "b_undoList" || to_jsonb($3::int),
+          "b_turn" = $4
+      where "r_id" = $5
       returning *;`;
-      const values = [`{${index}}`, JSON.stringify(playerColumn), index, r_id];
+      const values = [`{${index}}`, JSON.stringify(playerColumn), index, turn + 1, r_id];
       const zones = await client.query(zonesQuery, values);
 
       io.to(r_id).emit("placeZone", {b_zones: zones.rows[0].b_zones, index: index});
@@ -837,31 +846,6 @@ io.on("connection", (socket) => {
     const { u_id, u_name } = socket.data.datas;
 
     try {
-      const userRoomQuery = `
-      update "UserRoom" 
-      set "r_id" = null
-      where "u_id" = $1;`;
-      await client.query(userRoomQuery, [u_id]);
-
-      const leaveP1Query = `
-      update "Room"
-      set "r_player1" = null,
-          "r_p1Ready" = false
-      where "r_id" = $1
-      and "r_player1" = $2;`
-      await client.query(leaveP1Query, [r_id, u_name]);
-
-      const leaveP2Query = `
-      update "Room"
-      set "r_player2" = null,
-          "r_p2Ready" = false
-      where "r_id" = $1
-      and "r_player2" = $2;`
-      await client.query(leaveP2Query, [r_id, u_name]);
-
-      CancleReady(r_id, 1, u_name, false);
-      CancleReady(r_id, 2, u_name, false);
-
       const roomQuery = `
       update "Room" 
       set "r_players" = "r_players" - 1
@@ -869,6 +853,31 @@ io.on("connection", (socket) => {
       returning *;`;
       const room = await client.query(roomQuery, [r_id]);
       const roomData = room.rows[0];
+      var player1 = roomData.r_player1;
+      var player2 = roomData.r_player2;
+
+      if (player1 == u_name){
+        CancleReady(r_id, 1, u_name, false);
+        player1 = null;
+      }
+      if (player2 == u_name){
+        CancleReady(r_id, 2, u_name, false);
+        player2 = null;
+      }
+
+      const userRoomQuery = `
+      update "UserRoom" 
+      set "r_id" = null
+      where "u_id" = $1;`;
+      await client.query(userRoomQuery, [u_id]);
+
+      const leavePlayerQuery = `
+      update "Room"
+      set "r_player1" = $1,
+          "r_player2" = $2,
+          "r_p1Ready" = false
+      where "r_id" = $3;`
+      await client.query(leavePlayerQuery, [player1, player2, r_id]);
 
       if (roomData.r_players < 1) {
         await client.query(`
@@ -883,18 +892,18 @@ io.on("connection", (socket) => {
       select *
       from "User"
       where u_name = $1;`;
-      const p1 = await client.query(p1Query, [roomData.r_player1]);
+      const p1 = await client.query(p1Query, [player1]);
 
       const p2Query = `
       select *
       from "User"
       where u_name = $1;`;
-      const p2 = await client.query(p2Query, [roomData.r_player2]);
+      const p2 = await client.query(p2Query, [player2]);
 
       if (roomData) {
         io.to(r_id).emit("roomUpdate", {
           room: roomData, p1: p1.rows[0], p2: p2.rows[0],
-          p1_ready: roomData.r_p1Ready, p2_ready: roomData.r_p2Ready
+          p1_ready: (player1 != null), p2_ready: (player2 != null)
         });;
       }
 
