@@ -80,7 +80,7 @@ async function CheckReadys(socket, r_id) {
         } else {
           clearInterval(countdownInterval);
           countdowns.delete(r_id);
-          
+
           await StartGame(r_id);
           io.to(r_id).emit("started", { message: "Game started!" });
         }
@@ -123,7 +123,11 @@ async function CancleReady(r_id, p_num, u_name, is_join) {
       const player = await client.query(playerQuery, [u_name]);
 
       if (result.rows[0]) {
-        io.to(r_id).emit("playerUpdate", { player: player.rows[0], p_num: p_num, is_join: is_join, is_ready: false });
+        io.to(r_id).emit("playerUpdate",
+          {
+            player: player.rows[0], p_num: p_num,
+            is_join: is_join, is_ready: false
+          });
       }
     }
 
@@ -133,45 +137,45 @@ async function CancleReady(r_id, p_num, u_name, is_join) {
   }
 }
 
-async function StartGame(r_id){
+async function StartGame(r_id) {
   try {
-      const roomQuery = `
+    const roomQuery = `
       select "r_player1", "r_player2", "r_started", "r_isUndo"
       from "Room"
       where "r_id" = $1;`;
-      const room = await client.query(roomQuery, [r_id]);
-      const { r_player1, r_player2, r_started, r_isUndo } = room.rows[0];
+    const room = await client.query(roomQuery, [r_id]);
+    const { r_player1, r_player2, r_started, r_isUndo } = room.rows[0];
 
-      console.log("Start Room:", room.rows[0]);
-      if (r_started === true) {
-        console.log("Already started room.");
-        return;
-      }
+    console.log("Start Room:", room.rows[0]);
+    if (r_started === true) {
+      console.log("Already started room.");
+      return;
+    }
 
-      const startedQuery = `
+    const startedQuery = `
       update "Room"
       set "r_started" = true
       where "r_id" = $1;`;
-      await client.query(startedQuery, [r_id]);
+    await client.query(startedQuery, [r_id]);
 
-      try {
-        const createBoardQuery = `
+    try {
+      const createBoardQuery = `
         insert into "Board"("r_id", "b_player1", "b_player2", "b_isUndo")
         values($1, $2, $3, $4);`;
-        await client.query(createBoardQuery, [r_id, r_player1, r_player2, r_isUndo]); 
-        console.log(`Board created for room ${r_id}`);
-
-      } catch (err){
-        if (err.code === "23505") {
-          console.log(`Board for ${r_id} already exists`);
-        } else {
-          throw err;
-        }
-      }
+      await client.query(createBoardQuery, [r_id, r_player1, r_player2, r_isUndo]);
+      console.log(`Board created for room ${r_id}`);
 
     } catch (err) {
-      console.error("startGame Error:", err);
+      if (err.code === "23505") {
+        console.log(`Board for ${r_id} already exists`);
+      } else {
+        throw err;
+      }
     }
+
+  } catch (err) {
+    console.error("StartGame Error:", err);
+  }
 }
 
 async function EndGame(r_id, u_name) {
@@ -184,7 +188,7 @@ async function EndGame(r_id, u_name) {
           or "r_player2" is null)
     returning *;`;
     const room = await client.query(roomQuery, [r_id]);
-    
+
     if (room.rowCount === 0) {
       console.log("You can't end the room.");
       return false;
@@ -197,7 +201,32 @@ async function EndGame(r_id, u_name) {
     return true;
 
   } catch (err) {
-    console.error("endGame Error:", err);
+    console.error("EndGame Error:", err);
+    throw err;
+  }
+}
+
+async function CheckLevelup(u_name) {
+  try {
+    const userQuery = `
+    select "u_level", "u_exp"
+    from "User"
+    where "u_name" = $1;`
+    const user = await client.query(userQuery, [u_name]);
+    const userData = user.rows[0];
+    const exp = userData.u_exp - userData.u_level * 4
+
+    if (exp >= 0) {
+      const levelupQuery = `
+      update "User"
+      set "u_level" = "u_level" + 1,
+          "u_exp" = $1
+      where "u_name" = $2;`
+      await client.query(levelupQuery, [exp, u_name]);
+    }
+
+  } catch (err) {
+    console.error("CheckLevelup Error:", err);
     throw err;
   }
 }
@@ -211,8 +240,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  port: 5432, /* 집 */
-  // port: 5433, /* 회사 */
+  // port: 5432, /* 집 */
+  port: 5433, /* 회사 */
 });
 client.connect();
 
@@ -309,6 +338,15 @@ app.post("/Login", async (req, res) => {
     if (user.u_password !== u_password) {
       return res.status(401).json({ success: false, message: "The password is different." });
     }
+
+    if (user.u_logined === true) {
+      return res.status(401).json({ success: false, message: "This user is already logged in." });
+    }
+
+    await client.query(`
+    update "User" 
+    set "u_logined" = true 
+    where "u_id" = $1`, [u_id]);
 
     const token = jwt.sign(
       { u_id: user.u_id, u_name: user.u_name },
@@ -501,12 +539,12 @@ app.post('/OutGame', async (req, res) => {
     }
   }
 
-  try{
+  try {
     const result = await EndGame(r_id, req.user?.u_name);
     if (result == true) io.to(r_id).emit("ended");
     res.status(200).send('ok');
-    
-  } catch{
+
+  } catch {
     res.status(500).send('server error');
   }
 });
@@ -553,7 +591,9 @@ io.use((socket, next) => {
   }
 });
 
-io.on("connection", (socket) => {
+io.on("connection", async (socket) => {
+  console.log("socket connected:", socket.id);
+
   socket.on("refreshRoomList", async () => {
     await RefreshRoomList(socket);
   });
@@ -567,7 +607,7 @@ io.on("connection", (socket) => {
       socket.emit("roomError", { message: "Create room faild!" });
     }
   });
-  
+
   socket.on("joinRoom", async ({ r_id }) => {
     const { u_id, u_name } = socket.data.datas;
 
@@ -624,7 +664,7 @@ io.on("connection", (socket) => {
 
       await RefreshRoomList(null);
 
-      if (roomData.r_started){
+      if (roomData.r_started) {
         io.to(r_id).emit("started", { message: "Game started!" });
       }
 
@@ -692,7 +732,7 @@ io.on("connection", (socket) => {
     }
 
     try {
-      const playerColumn = p_num === 1 ?  "r_player1" : "r_player2";
+      const playerColumn = p_num === 1 ? "r_player1" : "r_player2";
       const playerLeaveQuery = `
       update "Room"
       set ${playerColumn} = null
@@ -749,8 +789,8 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("successStart", async ({r_id})=>{
-    try{
+  socket.on("successStart", async ({ r_id }) => {
+    try {
       const roomQuery = `
       select "r_player1", "r_player2"
       from "Room"
@@ -764,32 +804,41 @@ io.on("connection", (socket) => {
       where "r_id" = $1;`
       const zones = await client.query(zonesQuery, [r_id]);
 
-      io.to(r_id).emit("makeBoard", { 
-        b_player1: r_player1, b_player2: r_player2, 
+      io.to(r_id).emit("makeBoard", {
+        b_player1: r_player1, b_player2: r_player2,
         zonesState: zones.rows[0].b_zones,
         turnState: zones.rows[0].b_turn
       });
 
-    } catch (err){
+    } catch (err) {
       console.error("successStart Error:", err);
     }
   });
 
-  socket.on("selectZone", async ({r_id, turn, index})=>{
-    try{
+  socket.on("selectZone", async ({ r_id, turn, index }) => {
+    const { u_name } = socket.data.datas;
+
+    try {
+      const curPlayerColumn = turn % 2 === 0 ? "b_player1" : "b_player2";
       const checkZoneQuery = `
       select ("b_zones"::jsonb)-> ($1::int) as zone
       from "Board"
-      where "r_id" = $2`;
-      const result = await client.query(checkZoneQuery, [index, r_id]);
-      const zone = result.rows[0].zone;
+      where "r_id" = $2
+      and ${curPlayerColumn} = $3;`;
+      const result = await client.query(checkZoneQuery, [index, r_id, u_name]);
 
+      if (result.rowCount === 0) {
+        console.log("This is not the player.");
+        return;
+      }
+
+      const zone = result.rows[0].zone;
       if (zone !== '') {
         console.log("already place zone!");
         return;
       }
 
-      const playerColumn = turn % 2 === 0 ? '●': '○';
+      const playerColumn = turn % 2 === 0 ? '●' : '○';
       const zonesQuery = `
       update "Board"
       set "b_zones" = jsonb_set("b_zones", $1, $2::jsonb),
@@ -800,9 +849,9 @@ io.on("connection", (socket) => {
       const values = [`{${index}}`, JSON.stringify(playerColumn), index, turn + 1, r_id];
       const zones = await client.query(zonesQuery, values);
 
-      io.to(r_id).emit("placeZone", {b_zones: zones.rows[0].b_zones, index: index});
+      io.to(r_id).emit("placeZone", { b_zones: zones.rows[0].b_zones, index: index });
 
-    } catch (err){
+    } catch (err) {
       console.error("selectZone Error:", err);
       socket.emit("selectError", { message: "selectZone failed" });
     }
@@ -842,6 +891,37 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("endedGame", async ({ r_id, winner, loser }) => {
+    try {
+      const endedQuery = `
+      update "Board"
+      set "b_isPlaying" = false
+      where "r_id" = $1;`
+      await client.query(endedQuery, [r_id]);
+
+      const p1UpdateQuery = `
+      update "User"
+      set "u_win" = "u_win" + 1,
+          "u_exp" = "u_exp" + 3
+      where "u_name" = $1;`
+      await client.query(p1UpdateQuery, [winner]);
+      CheckLevelup(winner);
+
+      const p2UpdateQuery = `
+      update "User"
+      set "u_lose" = "u_lose" + 1,
+          "u_exp" = "u_exp" + 1
+      where "u_name" = $1;`
+      await client.query(p2UpdateQuery, [loser]);
+      CheckLevelup(loser);
+
+      // 랭킹 로직 추가해야 함!
+
+    } catch (err) {
+      console.error("endedGame error:", err);
+    }
+  });
+
   socket.on("leaveRoom", async ({ r_id }) => {
     const { u_id, u_name } = socket.data.datas;
 
@@ -855,14 +935,18 @@ io.on("connection", (socket) => {
       const roomData = room.rows[0];
       var player1 = roomData.r_player1;
       var player2 = roomData.r_player2;
+      var p1Ready = true;
+      var p2Ready = true;
 
-      if (player1 == u_name){
+      if (player1 == u_name) {
         CancleReady(r_id, 1, u_name, false);
         player1 = null;
+        p1Ready = false;
       }
-      if (player2 == u_name){
+      if (player2 == u_name) {
         CancleReady(r_id, 2, u_name, false);
         player2 = null;
+        p2Ready = false;
       }
 
       const userRoomQuery = `
@@ -875,9 +959,12 @@ io.on("connection", (socket) => {
       update "Room"
       set "r_player1" = $1,
           "r_player2" = $2,
-          "r_p1Ready" = false
-      where "r_id" = $3;`
-      await client.query(leavePlayerQuery, [player1, player2, r_id]);
+          "r_p1Ready" = $3,
+          "r_p2Ready" = $4
+      where "r_id" = $5;`
+      await client.query(leavePlayerQuery, [
+        player1, player2,
+        p1Ready, p2Ready, r_id]);
 
       if (roomData.r_players < 1) {
         await client.query(`
@@ -903,8 +990,8 @@ io.on("connection", (socket) => {
       if (roomData) {
         io.to(r_id).emit("roomUpdate", {
           room: roomData, p1: p1.rows[0], p2: p2.rows[0],
-          p1_ready: (player1 != null), p2_ready: (player2 != null)
-        });;
+          p1_ready: p1Ready, p2_ready: p2Ready
+        });
       }
 
       // 추후에 추가
@@ -918,6 +1005,29 @@ io.on("connection", (socket) => {
     } catch (err) {
       console.error("leaveRoom Error:", err);
     }
+  });
+
+  socket.on("disconnect", () => {
+    if (socket.isTokenReload) {
+      console.log("Reconnecting");
+      return;
+    }
+
+    const { u_id } = socket.data.datas;
+
+    setTimeout(async () => {
+      const stillOnline = [...io.sockets.sockets.values()]
+        .some(s => s.data?.datas?.u_id === u_id);
+
+      if (!stillOnline) {
+        await client.query(`
+        update "User"
+        set "u_logined" = false
+        where "u_id" = $1`, [u_id]);
+
+        console.log(`${u_id} logouted`);
+      }
+    }, 1000);
   });
 });
 

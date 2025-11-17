@@ -10,8 +10,8 @@ const Board: React.FC = () => {
   // [Game-state variables]
   const [zones, setZones] = useState<string[]>(Array<string>(rcCount * rcCount).fill(""));
   const r_id = useRef<string | null>(null);
-  const player1 = useRef<string | null>(null);
-  const player2 = useRef<string | null>(null);
+  const player1 = useRef<string>("");
+  const player2 = useRef<string>("");
   let selectZone = useRef(-1);
   let isPlaying = useRef(true);
   let turn = useRef(0);
@@ -33,7 +33,7 @@ const Board: React.FC = () => {
       turn.current = turnState;
     });
 
-    socket.on("placeZone", ({b_zones, index}) => {
+    socket.on("placeZone", ({ b_zones, index }) => {
       SelectZone(index);
       setZones(b_zones);
     });
@@ -45,7 +45,16 @@ const Board: React.FC = () => {
 
   // [Server part]
   const handleSelectZone = (index: number) => {
+    if (isPlaying.current === false || zones[index] !== "" || index === -1) {
+      console.log("ended Game!");
+      return;
+    }
+
     socket.emit("selectZone", { r_id: r_id.current, turn: turn.current, index: index });
+  }
+
+  const handleEndedGame = (winner: string, loser: string) => {
+    socket.emit("endedGame", { r_id: r_id.current, winner: winner, loser: loser });
   }
 
 
@@ -150,7 +159,6 @@ const Board: React.FC = () => {
   }
 
   function SelectZone(index: number) {
-    if (isPlaying.current === false || zones[index] !== "" || index === -1) return;
     const nextZones = zones.slice(); // copy
     nextZones[index] = turn.current % 2 === 0 ? "●" : "○";
     setZones(nextZones);
@@ -301,10 +309,12 @@ const Board: React.FC = () => {
 
       if (winner === 1) {
         alert("Winner: Player1!");
+        handleEndedGame(player1.current, player2.current);
       }
 
       if (winner === 2) {
         alert("Winner: Player2!");
+        handleEndedGame(player2.current, player1.current);
       }
 
       isPlaying.current = false;

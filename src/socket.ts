@@ -21,6 +21,7 @@ export function ReloadToken(token: string | null) {
     }
 
     socket.auth = { token: token };
+    (socket as any).isTokenReload = true;
 
     if (socket.connected) {
         console.log("Disconnecting old socket...");
@@ -34,6 +35,7 @@ export function ReloadToken(token: string | null) {
 socket.on("connect", () => {
     const r_id = sessionStorage.getItem("currentRoom");
     if (r_id) socket.emit("joinRoom", { r_id });
+    (socket as any).isTokenReload = false;
     console.log("Connected:", socket.id)
 });
 
