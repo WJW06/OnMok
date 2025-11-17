@@ -4,6 +4,7 @@ const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
+const { p } = require("framer-motion/client");
 require('dotenv').config();
 const SECRET_KEY = process.env.SECRET_KEY;
 
@@ -194,6 +195,18 @@ async function EndGame(r_id, u_name) {
       return false;
     }
 
+    if (u_name !== null){
+      const player1 = room.rows[0].r_player1;
+      if (player1 !== null){
+        UpdatePlayer(player1, true);
+      }
+
+      const player2 = room.rows[0].r_player2;
+      if (player1 !== null){
+        UpdatePlayer(player1, true);
+      }
+    }
+
     const deleteRoomQuery = `
     delete from "Board"
     where "r_id" = $1;`;
@@ -203,6 +216,31 @@ async function EndGame(r_id, u_name) {
   } catch (err) {
     console.error("EndGame Error:", err);
     throw err;
+  }
+}
+
+async function UpdatePlayer(u_name, isWin) {
+  try{
+    if (isWin){
+      const p1UpdateQuery = `
+      update "User"
+      set "u_win" = "u_win" + 1,
+          "u_exp" = "u_exp" + 3
+      where "u_name" = $1;`
+      await client.query(p1UpdateQuery, [u_name]);
+    }
+    else{
+      const p2UpdateQuery = `
+      update "User"
+      set "u_lose" = "u_lose" + 1,
+          "u_exp" = "u_exp" + 1
+      where "u_name" = $1;`
+      await client.query(p2UpdateQuery, [u_name]);
+    }
+    CheckLevelup(u_name);
+
+  }  catch (err) {
+
   }
 }
 
@@ -240,8 +278,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  // port: 5432, /* 집 */
-  port: 5433, /* 회사 */
+  port: 5432, /* 집 */
+  // port: 5433, /* 회사 */
 });
 client.connect();
 
@@ -694,14 +732,16 @@ io.on("connection", async (socket) => {
 
     try {
       const playerColumn = p_num === 1 ? "r_player1" : "r_player2";
-      const enemyCoumn = p_num !== 1 ? "r_player1" : "r_player2";
+      const enemyColumn = p_num !== 1 ? "r_player1" : "r_player2";
+      const unReadyColumn = p_num === 1 ? "r_p1Ready" : "r_p2Ready";
 
       const playerJoinQuery = `
       update "Room"
-      set "${playerColumn}" = $1
+      set "${playerColumn}" = $1,
+           "${unReadyColumn}" = false
       where "r_id" = $2
       and "${playerColumn}" is null
-      and ("${enemyCoumn}" != $3 or "${enemyCoumn}" is null)
+      and ("${enemyColumn}" != $3 or "${enemyColumn}" is null)
       returning *;`;
       const result = await client.query(playerJoinQuery, [u_name, r_id, u_name]);
 
@@ -716,7 +756,9 @@ io.on("connection", async (socket) => {
       where u_name = $1;`;
       const player = await client.query(playerQuery, [u_name]);
 
-      io.to(r_id).emit("playerUpdate", { player: player.rows[0], p_num: p_num, is_join: true, is_ready: false });
+      io.to(r_id).emit("playerUpdate", 
+        { player: player.rows[0], p_num: p_num, 
+          is_join: true, is_ready: false });
 
     } catch (err) {
       console.error("playerJoin Error:", err);
@@ -742,7 +784,9 @@ io.on("connection", async (socket) => {
       const result = await client.query(playerLeaveQuery, [r_id, u_name]);
 
       if (result.rows[0]) {
-        io.to(r_id).emit("playerUpdate", { player: null, p_num: p_num, is_join: false, is_ready: false });
+        io.to(r_id).emit("playerUpdate", 
+          { player: null, p_num: p_num, 
+            is_join: false, is_ready: false });
       }
 
     } catch (err) {
@@ -768,7 +812,8 @@ io.on("connection", async (socket) => {
       where "r_id" = $2
       and "${playerColumn}"  = $3
       returning *;`;
-      const result = await client.query(playerReadyQuery, [is_ready, r_id, u_name]);
+      const result = await client.query(playerReadyQuery, 
+        [is_ready, r_id, u_name]);
 
       if (result.rows[0]) {
         const playerQuery = `
@@ -777,7 +822,9 @@ io.on("connection", async (socket) => {
         where "u_name" = $1;`;
         const player = await client.query(playerQuery, [u_name]);
 
-        io.to(r_id).emit("playerUpdate", { player: player.rows[0], p_num: p_num, is_join: true, is_ready: is_ready });
+        io.to(r_id).emit("playerUpdate", 
+          { player: player.rows[0], p_num: p_num, 
+            is_join: true, is_ready: is_ready });
 
         if (is_ready) CheckReadys(socket, r_id);
         else CancleReady(r_id, p_num, u_name, true);
@@ -899,26 +946,50 @@ io.on("connection", async (socket) => {
       where "r_id" = $1;`
       await client.query(endedQuery, [r_id]);
 
-      const p1UpdateQuery = `
-      update "User"
-      set "u_win" = "u_win" + 1,
-          "u_exp" = "u_exp" + 3
-      where "u_name" = $1;`
-      await client.query(p1UpdateQuery, [winner]);
-      CheckLevelup(winner);
-
-      const p2UpdateQuery = `
-      update "User"
-      set "u_lose" = "u_lose" + 1,
-          "u_exp" = "u_exp" + 1
-      where "u_name" = $1;`
-      await client.query(p2UpdateQuery, [loser]);
-      CheckLevelup(loser);
+      UpdatePlayer(winner, true);
+      UpdatePlayer(loser, false);
 
       // 랭킹 로직 추가해야 함!
 
     } catch (err) {
       console.error("endedGame error:", err);
+    }
+  });
+
+  socket.on("GoRoom", async ({r_id}) =>{
+    const {u_name} = socket.data.datas;
+
+    try{
+      const leaveP1Query = `
+      update "Board"
+      set "b_player1" = null
+      where "r_id" = $1
+      and "b_player1" = $2;`
+      await client.query(leaveP1Query, [r_id, u_name]);
+
+      const leaveP2Query = `
+      update "Board"
+      set "b_player2" = null
+      where "r_id" = $1
+      and "b_player2" = $2;`
+      await client.query(leaveP2Query, [r_id, u_name]);
+      
+      socket.emit("ended");
+      
+      const playersQuery = `
+      select "b_isPlaying"
+      from "Board"
+      where "r_id" = $1
+      and "b_player1" is null
+      and "b_player2" is null;`
+      const players = await client.query(playersQuery, [r_id]);
+
+      if (players.rowCount !== 0){
+        EndGame(r_id, null);
+      }
+
+    } catch (err){
+      
     }
   });
 
@@ -941,12 +1012,10 @@ io.on("connection", async (socket) => {
       if (player1 == u_name) {
         CancleReady(r_id, 1, u_name, false);
         player1 = null;
-        p1Ready = false;
       }
       if (player2 == u_name) {
         CancleReady(r_id, 2, u_name, false);
         player2 = null;
-        p2Ready = false;
       }
 
       const userRoomQuery = `
@@ -958,13 +1027,24 @@ io.on("connection", async (socket) => {
       const leavePlayerQuery = `
       update "Room"
       set "r_player1" = $1,
-          "r_player2" = $2,
-          "r_p1Ready" = $3,
-          "r_p2Ready" = $4
-      where "r_id" = $5;`
-      await client.query(leavePlayerQuery, [
-        player1, player2,
-        p1Ready, p2Ready, r_id]);
+          "r_player2" = $2
+      where "r_id" = $3;`;
+      const result = await client.query(leavePlayerQuery, 
+        [player1, player2, r_id]);
+
+      if (roomData.r_p1Ready) p1Ready = true;
+      else p1Ready = false; 
+
+      if (roomData.r_p2Ready) p2Ready = true;
+      else p2Ready = false;
+
+      const readyQuery = `
+      update "Room"
+      set "r_p1Ready" = $1,
+          "r_p2Ready" = $2
+      where "r_id" = $3;`;
+      await client.query(readyQuery, 
+        [p1Ready, p2Ready, r_id]);
 
       if (roomData.r_players < 1) {
         await client.query(`

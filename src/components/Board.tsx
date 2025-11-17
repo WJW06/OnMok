@@ -57,6 +57,10 @@ const Board: React.FC = () => {
     socket.emit("endedGame", { r_id: r_id.current, winner: winner, loser: loser });
   }
 
+  const handleGoRoom = () => {
+    socket.emit("GoRoom", {r_id: r_id.current});
+  }
+
 
   // [Make UI part]
   type MakeRowProps = {
@@ -104,7 +108,7 @@ const Board: React.FC = () => {
     if (isPlaying.current) return <></>;
 
     return (
-      <button className='start-button' onClick={StartGame}>
+      <button className='start-button' onClick={handleGoRoom}>
         Go Room
       </button>
     );
