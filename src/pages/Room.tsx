@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ReloadToken, socket } from "../socket";
 import { UserInfo } from "../pages/Home";
 import { motion, AnimatePresence } from "framer-motion";
 import Board from '../components/Board';
+import ChatBox  from "../components/ChatBox";
 
 import "../styles/Room.css";
 
@@ -20,10 +21,10 @@ export interface RoomInfo {
 }
 
 export interface ChatMessage {
-  c_sender: string;
-  c_text: string;
-  c_created: string;
-  c_isEvent: boolean;
+    c_sender: string;
+    c_text: string;
+    c_created: string;
+    c_isEvent: boolean;
 }
 
 const Room: React.FC = () => {
@@ -34,10 +35,9 @@ const Room: React.FC = () => {
   const [player1State, setPlayer1State] = useState({ joined: false, ready: false });
   const [player2, setPlayer2] = useState<UserInfo | null>(null);
   const [player2State, setPlayer2State] = useState({ joined: false, ready: false });
+  const [roomState, setRoomState] = useState<string>("VS");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const [roomState, setRoomState] = useState<string>("VS");
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
@@ -95,6 +95,7 @@ const Room: React.FC = () => {
       console.log("Currnet messages:", messages);
     });
 
+
     socket.on("countdown", ({ seconds }) => {
       setRoomState(seconds);
     });
@@ -108,6 +109,7 @@ const Room: React.FC = () => {
       setStarted(true);
       const r_id = sessionStorage.getItem("currentRoom");
       socket.emit("successStart", { r_id: r_id });
+      console.log("started r_id:",r_id);
     });
 
     socket.on("ended", (isGameEnd: boolean) => {
@@ -139,13 +141,6 @@ const Room: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      console.log("Smoooooooth");
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
-
   const handleExit = async () => {
     try {
       const res = await fetch("http://localhost:5000/LeaveRoom", {
@@ -170,6 +165,15 @@ const Room: React.FC = () => {
     navigate("/Home");
   };
 
+  function SendMessage() {
+    if (input.trim() === "") return;
+
+    const r_id = sessionStorage.getItem("currentRoom");
+    socket.emit("sendMessage", { r_id, message: input, isEvent: false });
+    console.log("sended message is", input);
+    setInput("");
+  };
+
   const handlePlayerJoin = (pNum: number) => {
     const r_id = sessionStorage.getItem("currentRoom");
     socket.emit("playerJoin", { r_id, p_num: pNum });
@@ -184,15 +188,6 @@ const Room: React.FC = () => {
     const r_id = sessionStorage.getItem("currentRoom");
     socket.emit("playerReady", { r_id, p_num: pNum, is_ready: isReady });
   }
-
-  function SendMessage() {
-    if (input.trim() === "") return;
-
-    const r_id = sessionStorage.getItem("currentRoom");
-    socket.emit("sendMessage", { r_id, message: input, isEvent: false });
-    console.log("sended message is", input);
-    setInput("");
-  };
 
   function OutGame(r_id: string | null) {
     if (r_id) {
@@ -282,40 +277,12 @@ const Room: React.FC = () => {
                   </div>
                 </div>
               </div>
-
-              <div className="chat-box">
-                <div className="messages">
-                  {messages.map((message, idx) => (
-                    <div key={idx} className="chat-line">
-                      {message.c_isEvent === true && (
-                        <div>
-                          (<strong>{message.c_sender}</strong> {message.c_text} the room.)
-                        </div>
-                      )}
-                      {message.c_isEvent === false && (
-                        <div>
-                          <strong>{message.c_sender}</strong>: {message.c_text}
-                        </div>
-                      )}
-                      <span className="chat-time">
-                        {new Date(message.c_created).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  ))}
-                  <div ref={messagesEndRef}></div>
-                </div>
-
-                <div className="input-area">
-                  <input
-                    value={input}
-                    type="text"
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && SendMessage()}
-                    placeholder="(Input message.)"
-                  />
-                  <button className="send-btn" onClick={SendMessage}>➤</button>
-                </div>
-              </div>
+              <ChatBox
+                messages={messages}
+                input={input}
+                setInput={setInput}
+                sendMessage={SendMessage}
+              />
             </div>}
         </motion.div>
       )}
@@ -328,40 +295,12 @@ const Room: React.FC = () => {
           exit={{ opacity: 0 }}>{
             <>
               <Board />
-
-              <div className="chat-box">
-                <div className="messages">
-                  {messages.map((message, idx) => (
-                    <div key={idx} className="chat-line">
-                      {message.c_isEvent === true && (
-                        <div>
-                          (<strong>{message.c_sender}</strong> {message.c_text} the room.)
-                        </div>
-                      )}
-                      {message.c_isEvent === false && (
-                        <div>
-                          <strong>{message.c_sender}</strong>: {message.c_text}
-                        </div>
-                      )}
-                      <span className="chat-time">
-                        {new Date(message.c_created).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  ))}
-                  <div ref={messagesEndRef}></div>
-                </div>
-
-                <div className="input-area">
-                  <input
-                    value={input}
-                    type="text"
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && SendMessage()}
-                    placeholder="(Input message.)"
-                  />
-                  <button className="send-btn" onClick={SendMessage}>➤</button>
-                </div>
-              </div>
+              <ChatBox
+                messages={messages}
+                input={input}
+                setInput={setInput}
+                sendMessage={SendMessage}
+              />
             </>
           }
         </motion.div>

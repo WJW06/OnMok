@@ -288,8 +288,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  // port: 5432, /* 집 */
-  port: 5433, /* 회사 */
+  port: 5432, /* 집 */
+  // port: 5433, /* 회사 */
 });
 client.connect();
 
@@ -756,6 +756,11 @@ io.on("connection", async (socket) => {
       returning *;`;
       const result = await client.query(playerJoinQuery, [u_name, r_id, u_name]);
 
+      if (!socket.data.datas || !socket.data.datas.u_name) {
+        console.log("⚠ selectZone arrived before auth finished");
+        return;
+      }
+
       if (result.rowCount === 0) {
         console.log("You can't join!");
         return socket.emit("playerError", { message: "playerJoin failed" });
@@ -891,6 +896,7 @@ io.on("connection", async (socket) => {
       and ${curPlayerColumn} = $3;`;
       const result = await client.query(checkZoneQuery, [index, r_id, u_name]);
 
+      console.log(result.rows[0]);
       if (result.rowCount === 0) {
         console.log("This is not the player.");
         return;
@@ -1064,10 +1070,10 @@ io.on("connection", async (socket) => {
       await client.query(leavePlayerQuery,
         [player1, player2, r_id]);
 
-      if (player1) p1Ready = true;
+      if (player1 && roomData.r_p1Ready) p1Ready = true;
       else p1Ready = false;
 
-      if (player2) p2Ready = true;
+      if (player2  && roomData.r_p2Ready) p2Ready = true;
       else p2Ready = false;
 
       const readyQuery = `

@@ -9,7 +9,7 @@ const rcCount: number = 18;
 const Board: React.FC = () => {
   // [Game-state variables]
   const [zones, setZones] = useState<string[]>(Array<string>(rcCount * rcCount).fill(""));
-  const r_id = useRef<string | null>(null);
+  // const r_id = useRef<string | null>(null);
   const player1 = useRef<string>("");
   const player2 = useRef<string>("");
   let selectZone = useRef(-1);
@@ -25,8 +25,6 @@ const Board: React.FC = () => {
       .then((data) => { console.log(data) })
 
     socket.on("makeBoard", ({ b_player1, b_player2, zonesState, turnState }) => {
-      const session_r_id = sessionStorage.getItem("currentRoom");
-      r_id.current = session_r_id;
       player1.current = b_player1;
       player2.current = b_player2;
       turn.current = turnState;
@@ -52,15 +50,19 @@ const Board: React.FC = () => {
       return;
     }
 
-    socket.emit("selectZone", { r_id: r_id.current, turn: turn.current, index: index });
+    const r_id = sessionStorage.getItem("currentRoom");
+    console.log("select:",r_id, "turn:",turn.current, "index:", index);
+    socket.emit("selectZone", { r_id: r_id, turn: turn.current, index: index });
   }
 
   const handleEndedGame = (winner: string, loser: string) => {
-    socket.emit("endedGame", { r_id: r_id.current, winner: winner, loser: loser });
+          const r_id = sessionStorage.getItem("currentRoom");
+    socket.emit("endedGame", { r_id: r_id, winner: winner, loser: loser });
   }
 
   const handleGoRoom = () => {
-    socket.emit("goRoom", { r_id: r_id.current });
+    const r_id = sessionStorage.getItem("currentRoom");
+    socket.emit("goRoom", { r_id: r_id });
   }
 
 
@@ -285,12 +287,12 @@ const Board: React.FC = () => {
       }
 
       if (winner === 1) {
-        alert("Winner: Player1!");
+        alert(`Winner:${player1.current}!`);
         handleEndedGame(player1.current, player2.current);
       }
 
       if (winner === 2) {
-        alert("Winner: Player2!");
+        alert(`Winner:${player2.current}!`);
         handleEndedGame(player2.current, player1.current);
       }
 
