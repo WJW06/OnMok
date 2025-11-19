@@ -185,25 +185,27 @@ async function EndGame(r_id, u_name) {
     update "Room"
     set "r_started" = false
     where "r_id" = $1
-    and ("r_player1" is null
+    and (("r_player1" is null
           or "r_player2" is null)
+    or ("r_player1" = $2
+          or "r_player2" = $2))
     returning *;`;
-    const room = await client.query(roomQuery, [r_id]);
+    const room = await client.query(roomQuery, [r_id, u_name]);
 
     if (room.rowCount === 0) {
       console.log("You can't end the room.");
       return false;
     }
 
-    if (u_name !== null){
+    if (u_name !== null) {
       const player1 = room.rows[0].r_player1;
-      if (player1 !== null){
+      if (player1 !== null) {
         UpdatePlayer(player1, true);
       }
 
       const player2 = room.rows[0].r_player2;
-      if (player1 !== null){
-        UpdatePlayer(player1, true);
+      if (player2 !== null) {
+        UpdatePlayer(player2, true);
       }
     }
 
@@ -220,8 +222,8 @@ async function EndGame(r_id, u_name) {
 }
 
 async function UpdatePlayer(u_name, isWin) {
-  try{
-    if (isWin){
+  try {
+    if (isWin) {
       const p1UpdateQuery = `
       update "User"
       set "u_win" = "u_win" + 1,
@@ -229,7 +231,7 @@ async function UpdatePlayer(u_name, isWin) {
       where "u_name" = $1;`
       await client.query(p1UpdateQuery, [u_name]);
     }
-    else{
+    else {
       const p2UpdateQuery = `
       update "User"
       set "u_lose" = "u_lose" + 1,
@@ -239,18 +241,26 @@ async function UpdatePlayer(u_name, isWin) {
     }
     CheckLevelup(u_name);
 
-  }  catch (err) {
+  } catch (err) {
 
   }
 }
 
 async function CheckLevelup(u_name) {
   try {
+    console.log(u_name);
+
     const userQuery = `
     select "u_level", "u_exp"
     from "User"
     where "u_name" = $1;`
     const user = await client.query(userQuery, [u_name]);
+
+    if (user.rowCount === 0) {
+      console.log("Not found this user.");
+      return;
+    };
+
     const userData = user.rows[0];
     const exp = userData.u_exp - userData.u_level * 4
 
@@ -278,8 +288,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  port: 5432, /* 집 */
-  // port: 5433, /* 회사 */
+  // port: 5432, /* 집 */
+  port: 5433, /* 회사 */
 });
 client.connect();
 
@@ -578,8 +588,9 @@ app.post('/OutGame', async (req, res) => {
   }
 
   try {
+    console.log("Out user is", req.user?.u_name);
     const result = await EndGame(r_id, req.user?.u_name);
-    if (result == true) io.to(r_id).emit("ended");
+    if (result == true) io.to(r_id).emit("ended", false);
     res.status(200).send('ok');
 
   } catch {
@@ -703,11 +714,11 @@ io.on("connection", async (socket) => {
       await RefreshRoomList(null);
 
       if (roomData.r_started) {
-        io.to(r_id).emit("started", { message: "Game started!" });
+        socket.emit("started", { message: "Game started!" });
       }
 
       const chatQuery = `
-      select "c_sender", "c_text", "c_created"
+      select "c_sender", "c_text", "c_created", "c_isEvent"
       from "Chat"
       where "r_id" = $1
       order by "c_created" desc
@@ -756,9 +767,11 @@ io.on("connection", async (socket) => {
       where u_name = $1;`;
       const player = await client.query(playerQuery, [u_name]);
 
-      io.to(r_id).emit("playerUpdate", 
-        { player: player.rows[0], p_num: p_num, 
-          is_join: true, is_ready: false });
+      io.to(r_id).emit("playerUpdate",
+        {
+          player: player.rows[0], p_num: p_num,
+          is_join: true, is_ready: false
+        });
 
     } catch (err) {
       console.error("playerJoin Error:", err);
@@ -784,9 +797,11 @@ io.on("connection", async (socket) => {
       const result = await client.query(playerLeaveQuery, [r_id, u_name]);
 
       if (result.rows[0]) {
-        io.to(r_id).emit("playerUpdate", 
-          { player: null, p_num: p_num, 
-            is_join: false, is_ready: false });
+        io.to(r_id).emit("playerUpdate",
+          {
+            player: null, p_num: p_num,
+            is_join: false, is_ready: false
+          });
       }
 
     } catch (err) {
@@ -812,7 +827,7 @@ io.on("connection", async (socket) => {
       where "r_id" = $2
       and "${playerColumn}"  = $3
       returning *;`;
-      const result = await client.query(playerReadyQuery, 
+      const result = await client.query(playerReadyQuery,
         [is_ready, r_id, u_name]);
 
       if (result.rows[0]) {
@@ -822,9 +837,11 @@ io.on("connection", async (socket) => {
         where "u_name" = $1;`;
         const player = await client.query(playerQuery, [u_name]);
 
-        io.to(r_id).emit("playerUpdate", 
-          { player: player.rows[0], p_num: p_num, 
-            is_join: true, is_ready: is_ready });
+        io.to(r_id).emit("playerUpdate",
+          {
+            player: player.rows[0], p_num: p_num,
+            is_join: true, is_ready: is_ready
+          });
 
         if (is_ready) CheckReadys(socket, r_id);
         else CancleReady(r_id, p_num, u_name, true);
@@ -851,7 +868,7 @@ io.on("connection", async (socket) => {
       where "r_id" = $1;`
       const zones = await client.query(zonesQuery, [r_id]);
 
-      io.to(r_id).emit("makeBoard", {
+      socket.emit("makeBoard", {
         b_player1: r_player1, b_player2: r_player2,
         zonesState: zones.rows[0].b_zones,
         turnState: zones.rows[0].b_turn
@@ -904,14 +921,14 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("sendMessage", async ({ r_id, message }) => {
+  socket.on("sendMessage", async ({ r_id, message, isEvent }) => {
     const { u_name } = socket.data.datas;
 
     try {
       const insertQuery = `
-      insert into "Chat" ("r_id", "c_sender", "c_text")
-      values ($1, $2, $3);`;
-      await client.query(insertQuery, [r_id, u_name, message]);
+      insert into "Chat" ("r_id", "c_sender", "c_text", "c_isEvent")
+      values ($1, $2, $3, $4);`;
+      await client.query(insertQuery, [r_id, u_name, message, isEvent]);
 
       const trimQuery = `
       delete from "Chat" 
@@ -928,6 +945,7 @@ io.on("connection", async (socket) => {
         c_sender: u_name,
         c_text: message,
         c_created: new Date().toISOString(),
+        c_isEvent: isEvent,
       });
 
       console.log("newMessage is", { u_name, message });
@@ -956,40 +974,54 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("GoRoom", async ({r_id}) =>{
-    const {u_name} = socket.data.datas;
+  socket.on("goRoom", async ({ r_id }) => {
+    const { u_name } = socket.data.datas;
 
-    try{
-      const leaveP1Query = `
-      update "Board"
-      set "b_player1" = null
-      where "r_id" = $1
-      and "b_player1" = $2;`
-      await client.query(leaveP1Query, [r_id, u_name]);
-
-      const leaveP2Query = `
-      update "Board"
-      set "b_player2" = null
-      where "r_id" = $1
-      and "b_player2" = $2;`
-      await client.query(leaveP2Query, [r_id, u_name]);
-      
-      socket.emit("ended");
-      
+    try {
       const playersQuery = `
-      select "b_isPlaying"
-      from "Board"
-      where "r_id" = $1
-      and "b_player1" is null
-      and "b_player2" is null;`
+      select "r_player1", "r_player2"
+      from "Room"
+      where "r_id" = $1;`
       const players = await client.query(playersQuery, [r_id]);
+      const p1 = players.rows[0].r_player1;
+      const p2 = players.rows[0].r_player2;
+      var b_pColumn = null;
 
-      if (players.rowCount !== 0){
-        EndGame(r_id, null);
+      if (p1 === u_name) {
+        b_pColumn = "b_player1";
+        r_pColumn = "r_player1";
+      }
+      else if (p2 === u_name) {
+        b_pColumn = "b_player2";
+        r_pColumn = "r_player2";
       }
 
-    } catch (err){
-      
+      if (b_pColumn !== null) {
+        const leaveBoardrQuery = `
+        update "Board"
+        set ${b_pColumn} = null
+        where "r_id" = $1
+        and ${b_pColumn} = $2;`
+        await client.query(leaveBoardrQuery, [r_id, u_name]);
+
+        const playersQuery = `
+        select "b_isPlaying"
+        from "Board"
+        where "r_id" = $1
+        and "b_player1" is null
+        and "b_player2" is null;`
+        const players = await client.query(playersQuery, [r_id]);
+
+        if (players.rowCount !== 0) {
+          EndGame(r_id, u_name);
+          io.to(r_id).emit("ended", false);
+        }
+      }
+
+      socket.emit("ended", true);
+
+    } catch (err) {
+
     }
   });
 
@@ -1029,13 +1061,13 @@ io.on("connection", async (socket) => {
       set "r_player1" = $1,
           "r_player2" = $2
       where "r_id" = $3;`;
-      const result = await client.query(leavePlayerQuery, 
+      await client.query(leavePlayerQuery,
         [player1, player2, r_id]);
 
-      if (roomData.r_p1Ready) p1Ready = true;
-      else p1Ready = false; 
+      if (player1) p1Ready = true;
+      else p1Ready = false;
 
-      if (roomData.r_p2Ready) p2Ready = true;
+      if (player2) p2Ready = true;
       else p2Ready = false;
 
       const readyQuery = `
@@ -1043,7 +1075,7 @@ io.on("connection", async (socket) => {
       set "r_p1Ready" = $1,
           "r_p2Ready" = $2
       where "r_id" = $3;`;
-      await client.query(readyQuery, 
+      await client.query(readyQuery,
         [p1Ready, p2Ready, r_id]);
 
       if (roomData.r_players < 1) {

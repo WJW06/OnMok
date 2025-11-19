@@ -91,7 +91,8 @@ create table "Chat"(
 "r_id" varchar(8) references "Room" ("r_id") on delete cascade,
 "c_sender" varchar(40) references "User" ("u_name"),
 "c_text" text default '',
-"c_created" timestamptz default now()
+"c_created" timestamptz default now(),
+"c_isEvent" boolean
 );
 
 delete from "Chat";

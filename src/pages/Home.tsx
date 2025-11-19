@@ -228,7 +228,7 @@ const Home: React.FC = () => {
           <div className="level-box">
             <span className="level-text">Level {user.u_level}</span>
             <div className="level-bar">
-              <span className="level-percent">{(user.u_exp / (4 + user.u_level * 4)) * 100}%</span>
+              <span className="level-percent">{((user.u_exp / (4 + user.u_level * 4)) * 100).toFixed(1)}%</span>
               <div className="level-fill" style={{ width: `${(user.u_exp / (4 + user.u_level * 4)) * 100}%` }}>
               </div>
             </div>

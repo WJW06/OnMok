@@ -29,10 +29,10 @@ const Board: React.FC = () => {
       r_id.current = session_r_id;
       player1.current = b_player1;
       player2.current = b_player2;
-      setZones(zonesState);
       turn.current = turnState;
+      setZones(zonesState);
+      InitGameState(zonesState);
     });
-
     socket.on("placeZone", ({ b_zones, index }) => {
       SelectZone(index);
       setZones(b_zones);
@@ -40,6 +40,8 @@ const Board: React.FC = () => {
 
     return () => {
       socket.off("makeBoard");
+      socket.off("makedZones");
+      socket.off("placeZone");
     }
   }, []);
 
@@ -58,7 +60,7 @@ const Board: React.FC = () => {
   }
 
   const handleGoRoom = () => {
-    socket.emit("GoRoom", {r_id: r_id.current});
+    socket.emit("goRoom", { r_id: r_id.current });
   }
 
 
@@ -122,44 +124,15 @@ const Board: React.FC = () => {
 
 
   // [GameManager part]
-  function StartGame() {
-    const startButton = document.querySelector('.start-button');
-    if (startButton instanceof HTMLButtonElement) {
-      console.log("startButton none");
-      startButton.style.display = 'none';
-    }
-
-    const turnText = document.querySelector('.turn-text');
-    if (turnText instanceof HTMLSpanElement) {
-      console.log("turnText none");
-      turnText.style.display = 'block';
-    }
-
-    isPlaying.current = true;
-  }
-
-  function InitGameState() {
-    const resetZones = zones.slice();
+  function InitGameState(zonesState: Array<string>) {
+    console.log("InitGameState zones:", zonesState);
     for (let i = 0; i < rcCount * rcCount; ++i) {
-      resetZones[i] = "";
-      player1Zones.current[i] = false;
-      player2Zones.current[i] = false;
+      player1Zones.current[i] = zonesState[i] === "●" ? true : false;
+      player2Zones.current[i] = zonesState[i] === "○" ? true : false;
     }
-    setZones(resetZones);
-    turn.current = 0;
-    isPlaying.current = false;
-    player1Count.current = 0;
-    player2Count.current = 0;
-
-    console.log("[InitGameState Start]")
-    console.log("isPlaying: " + isPlaying);
-    console.log("Zones: " + zones);
-    console.log("turn: " + turn);
-    console.log("player1Zones: " + player1Zones);
-    console.log("player1Count: " + player1Count);
-    console.log("player2Zones: " + player2Zones);
-    console.log("player2Count: " + player2Count);
-    console.log("[InitGameState End]")
+    isPlaying.current = true;
+    player1Count.current = turn.current / 2;
+    player2Count.current = (turn.current - 1) / 2;
   }
 
   function SelectZone(index: number) {

@@ -23,6 +23,7 @@ export interface ChatMessage {
   c_sender: string;
   c_text: string;
   c_created: string;
+  c_isEvent: boolean;
 }
 
 const Room: React.FC = () => {
@@ -53,9 +54,11 @@ const Room: React.FC = () => {
       socket.connect();
     }
 
-    socket.on("playerUpdate", ({ player, p_num, is_join, is_ready }) => {
-      console.log("Reload player state:", player);
+    const r_id = sessionStorage.getItem("currentRoom");
+    socket.emit("sendMessage",
+      { r_id: r_id, message: "entered", isEvent: true });
 
+    socket.on("playerUpdate", ({ player, p_num, is_join, is_ready }) => {
       if (p_num === 1) {
         setPlayer1(player);
         setPlayer1State({ joined: is_join, ready: is_ready });
@@ -70,14 +73,11 @@ const Room: React.FC = () => {
     });
 
     socket.on("roomUpdate", ({ room, p1, p2, p1_ready, p2_ready }) => {
-      console.log("Reload room state:", room);
       setRoomData(room);
       setPlayer1(p1);
       setPlayer2(p2);
       setPlayer1State({ joined: p1 != null, ready: p1_ready });
       setPlayer2State({ joined: p2 != null, ready: p2_ready });
-
-      console.log("r_id!:", room.r_id);
     });
 
     socket.on("roomError", (msg) => {
@@ -87,13 +87,12 @@ const Room: React.FC = () => {
 
     socket.on("loadChat", (history: ChatMessage[]) => {
       setMessages(history);
-      console.log("loadChat:", history);
     });
 
     socket.on("newMessage", (message: ChatMessage) => {
       setMessages((prev) => [...prev, message]);
       console.log("newMessage:", message);
-      console.log("Currnet messages:",messages);
+      console.log("Currnet messages:", messages);
     });
 
     socket.on("countdown", ({ seconds }) => {
@@ -101,7 +100,6 @@ const Room: React.FC = () => {
     });
 
     socket.on("cancleCountdown", () => {
-      console.log("Countdown canceled.");
       setRoomState("VS");
     })
 
@@ -109,16 +107,22 @@ const Room: React.FC = () => {
       setRoomState("VS");
       setStarted(true);
       const r_id = sessionStorage.getItem("currentRoom");
-      socket.emit("successStart", {r_id: r_id});
+      socket.emit("successStart", { r_id: r_id });
     });
 
-    socket.on("ended", () => {
+    socket.on("ended", (isGameEnd: boolean) => {
       setStarted(false);
+      if (isGameEnd) {
+        handlePlayerReady(1, false);
+        handlePlayerReady(2, false);
+      }
     });
 
     return () => {
       const r_id = sessionStorage.getItem("currentRoom");
       OutGame(r_id);
+      socket.emit("sendMessage",
+        { r_id: r_id, message: "left", isEvent: true });
       socket.emit("leaveRoom", { r_id });
       socket.off("ended");
       socket.off("started");
@@ -167,21 +171,25 @@ const Room: React.FC = () => {
   };
 
   const handlePlayerJoin = (pNum: number) => {
-    socket.emit("playerJoin", { r_id: roomData?.r_id, p_num: pNum });
+    const r_id = sessionStorage.getItem("currentRoom");
+    socket.emit("playerJoin", { r_id, p_num: pNum });
   }
 
   const handlePlayerLeave = (pNum: number) => {
-    socket.emit("playerLeave", { r_id: roomData?.r_id, p_num: pNum });
+    const r_id = sessionStorage.getItem("currentRoom");
+    socket.emit("playerLeave", { r_id, p_num: pNum });
   }
 
   const handlePlayerReady = (pNum: number, isReady: boolean) => {
-    socket.emit("playerReady", { r_id: roomData?.r_id, p_num: pNum, is_ready: isReady });
+    const r_id = sessionStorage.getItem("currentRoom");
+    socket.emit("playerReady", { r_id, p_num: pNum, is_ready: isReady });
   }
 
   function SendMessage() {
     if (input.trim() === "") return;
 
-    socket.emit("sendMessage", { r_id: roomData?.r_id, message: input });
+    const r_id = sessionStorage.getItem("currentRoom");
+    socket.emit("sendMessage", { r_id, message: input, isEvent: false });
     console.log("sended message is", input);
     setInput("");
   };
@@ -275,13 +283,20 @@ const Room: React.FC = () => {
                 </div>
               </div>
 
-              <div className= "chat-box">
+              <div className="chat-box">
                 <div className="messages">
                   {messages.map((message, idx) => (
                     <div key={idx} className="chat-line">
-                      <div>
-                        <strong>{message.c_sender}</strong>: {message.c_text}
-                      </div>
+                      {message.c_isEvent === true && (
+                        <div>
+                          (<strong>{message.c_sender}</strong> {message.c_text} the room.)
+                        </div>
+                      )}
+                      {message.c_isEvent === false && (
+                        <div>
+                          <strong>{message.c_sender}</strong>: {message.c_text}
+                        </div>
+                      )}
                       <span className="chat-time">
                         {new Date(message.c_created).toLocaleTimeString()}
                       </span>
@@ -313,14 +328,21 @@ const Room: React.FC = () => {
           exit={{ opacity: 0 }}>{
             <>
               <Board />
-              
-              <div className= "chat-box">
+
+              <div className="chat-box">
                 <div className="messages">
                   {messages.map((message, idx) => (
                     <div key={idx} className="chat-line">
-                      <div>
-                        <strong>{message.c_sender}</strong>: {message.c_text}
-                      </div>
+                      {message.c_isEvent === true && (
+                        <div>
+                          (<strong>{message.c_sender}</strong> {message.c_text} the room.)
+                        </div>
+                      )}
+                      {message.c_isEvent === false && (
+                        <div>
+                          <strong>{message.c_sender}</strong>: {message.c_text}
+                        </div>
+                      )}
                       <span className="chat-time">
                         {new Date(message.c_created).toLocaleTimeString()}
                       </span>
