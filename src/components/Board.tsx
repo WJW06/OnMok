@@ -24,22 +24,28 @@ const Board: React.FC = () => {
       .then((res) => res.json())
       .then((data) => { console.log(data) })
 
-    socket.on("makeBoard", ({ b_player1, b_player2, zonesState, turnState }) => {
+    socket.on("makeBoard", ({ b_player1, b_player2, zonesState, turnState, b_isPlaying }) => {
       player1.current = b_player1;
       player2.current = b_player2;
       turn.current = turnState;
+      isPlaying.current = b_isPlaying;
       setZones(zonesState);
       InitGameState(zonesState);
     });
+
     socket.on("placeZone", ({ b_zones, index }) => {
       SelectZone(index);
       setZones(b_zones);
     });
 
+    socket.on("forceWin", ({ leavePlayer }) => {
+      CheckWinner(leavePlayer);
+    });
+
     return () => {
       socket.off("makeBoard");
-      socket.off("makedZones");
       socket.off("placeZone");
+      socket.off("forceWin");
     }
   }, []);
 
@@ -51,13 +57,14 @@ const Board: React.FC = () => {
     }
 
     const r_id = sessionStorage.getItem("currentRoom");
-    console.log("select:",r_id, "turn:",turn.current, "index:", index);
+    console.log("select:", r_id, "turn:", turn.current, "index:", index);
     socket.emit("selectZone", { r_id: r_id, turn: turn.current, index: index });
   }
 
   const handleEndedGame = (winner: string, loser: string) => {
-          const r_id = sessionStorage.getItem("currentRoom");
-    socket.emit("endedGame", { r_id: r_id, winner: winner, loser: loser });
+    const r_id = sessionStorage.getItem("currentRoom");
+    socket.emit("endedGame",
+      { r_id: r_id, winner: winner, loser: loser });
   }
 
   const handleGoRoom = () => {
@@ -132,7 +139,6 @@ const Board: React.FC = () => {
       player1Zones.current[i] = zonesState[i] === "●" ? true : false;
       player2Zones.current[i] = zonesState[i] === "○" ? true : false;
     }
-    isPlaying.current = true;
     player1Count.current = turn.current / 2;
     player2Count.current = (turn.current - 1) / 2;
   }
@@ -145,11 +151,11 @@ const Board: React.FC = () => {
 
     if (turn.current % 2 === 0) {
       player1Zones.current[index] = true;
-      if (++player1Count.current > 4) CheckWinner();
+      if (++player1Count.current > 4) CheckWinner(0);
     }
     else {
       player2Zones.current[index] = true;
-      if (++player2Count.current > 4) CheckWinner();
+      if (++player2Count.current > 4) CheckWinner(0);
     }
     ++turn.current;
 
@@ -275,23 +281,23 @@ const Board: React.FC = () => {
     else return 0;
   }
 
-  function CheckWinner() {
+  function CheckWinner(leavePlayer: number) {
     console.log("Checking Winner...");
     const winner: number = CheckLine();
 
-    if (winner !== 0) {
+    if (winner !== 0 || leavePlayer !== 0) {
       const startButton = document.querySelector('.start-button');
       if (startButton instanceof HTMLButtonElement) {
         console.log("startButton none");
         startButton.style.display = 'none';
       }
 
-      if (winner === 1) {
+      if (winner === 1 || leavePlayer == 2) {
         alert(`Winner:${player1.current}!`);
         handleEndedGame(player1.current, player2.current);
       }
 
-      if (winner === 2) {
+      if (winner === 2 || leavePlayer == 1) {
         alert(`Winner:${player2.current}!`);
         handleEndedGame(player2.current, player1.current);
       }

@@ -4,7 +4,6 @@ const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
-const { p } = require("framer-motion/client");
 require('dotenv').config();
 const SECRET_KEY = process.env.SECRET_KEY;
 
@@ -57,6 +56,108 @@ async function RefreshRoomList(socket = null) {
   }
 }
 
+async function LeaveRoomPlayer(r_id, u_id, u_name) {
+  try {
+    const roomQuery = `
+    update "Room" 
+    set "r_players" = "r_players" - 1
+    where "r_id" = $1
+    returning *;`;
+    const room = await client.query(roomQuery, [r_id]);
+    const roomData = room.rows[0];
+    var player1 = roomData.r_player1;
+    var player2 = roomData.r_player2;
+    var p1Ready = true;
+    var p2Ready = true;
+
+    if (player1 == u_name) {
+      CancleReady(r_id, 1, u_name, false);
+      player1 = null;
+    }
+    if (player2 == u_name) {
+      CancleReady(r_id, 2, u_name, false);
+      player2 = null;
+    }
+
+    const userRoomQuery = `
+    update "UserRoom" 
+    set "r_id" = null
+    where "u_id" = $1;`;
+    await client.query(userRoomQuery, [u_id]);
+
+    const leavePlayerQuery = `
+    update "Room"
+    set "r_player1" = $1,
+        "r_player2" = $2
+    where "r_id" = $3;`;
+    await client.query(leavePlayerQuery,
+      [player1, player2, r_id]);
+
+    if (player1 && roomData.r_p1Ready) p1Ready = true;
+    else p1Ready = false;
+
+    if (player2 && roomData.r_p2Ready) p2Ready = true;
+    else p2Ready = false;
+
+    const readyQuery = `
+    update "Room"
+    set "r_p1Ready" = $1,
+        "r_p2Ready" = $2
+    where "r_id" = $3;`;
+    await client.query(readyQuery,
+      [p1Ready, p2Ready, r_id]);
+
+    if (roomData.r_players < 1) {
+      await client.query(`
+      delete from "Room" 
+      where "r_id" = $1;`, [r_id]);
+      console.log(`Remove room (${r_id})`);
+      await RefreshRoomList();
+      return;
+    }
+
+    const p1Query = `
+    select *
+    from "User"
+    where u_name = $1;`;
+    const p1 = await client.query(p1Query, [player1]);
+
+    const p2Query = `
+    select *
+    from "User"
+    where u_name = $1;`;
+    const p2 = await client.query(p2Query, [player2]);
+
+    if (roomData) {
+      io.to(r_id).emit("roomUpdate", {
+        room: roomData, p1: p1.rows[0], p2: p2.rows[0],
+        p1_ready: p1Ready, p2_ready: p2Ready
+      });
+      io.to(r_id).emit("newMessage", {
+        c_sender: u_name,
+        c_text: "left",
+        c_created: new Date().toISOString(),
+        c_isEvent: true,
+      });
+    }
+
+    const isPlayingQuery = `
+    select "b_isPlaying"
+    from "Board"
+    where "r_id" = $1;`;
+    const isPlaying = await client.query(isPlayingQuery, [r_id]);
+
+    if (isPlaying.rows[0]) {
+      EndGame(r_id, u_name, u_name);
+      io.to(r_id).emit("ended");
+    }
+
+    await RefreshRoomList(null);
+  } catch (err) {
+    console.error("LeaveRoomPlayer Error:", err);
+  }
+}
+
 const countdowns = new Map();
 
 async function CheckReadys(socket, r_id) {
@@ -91,8 +192,8 @@ async function CheckReadys(socket, r_id) {
     }
 
   } catch (err) {
-    console.error("checkReadys Error:", err);
-    socket.emit("readysError", { message: "checkReadys failed" });
+    console.error("CheckReadys Error:", err);
+    socket.emit("ReadysError", { message: "CheckReadys failed" });
   }
 }
 
@@ -133,8 +234,8 @@ async function CancleReady(r_id, p_num, u_name, is_join) {
     }
 
   } catch (err) {
-    console.error("cancleReady Error:", err);
-    socket.emit("cancleError", { message: "cancleReady failed" });
+    console.error("CancleReady Error:", err);
+    socket.emit("CancleError", { message: "CancleReady failed" });
   }
 }
 
@@ -179,32 +280,33 @@ async function StartGame(r_id) {
   }
 }
 
-async function EndGame(r_id, u_name) {
+async function EndGame(r_id, leaveUser, leavePlayer) {
   try {
     const roomQuery = `
     update "Room"
     set "r_started" = false
     where "r_id" = $1
+    and "r_started" = true
     and (("r_player1" is null
           or "r_player2" is null)
-    or ("r_player1" = $2
-          or "r_player2" = $2))
+      or ("r_player1" = $2
+            or "r_player2" = $2))
     returning *;`;
-    const room = await client.query(roomQuery, [r_id, u_name]);
+    const room = await client.query(roomQuery, [r_id, leaveUser]);
 
     if (room.rowCount === 0) {
       console.log("You can't end the room.");
       return false;
     }
 
-    if (u_name !== null) {
+    if (leavePlayer !== null) {
       const player1 = room.rows[0].r_player1;
-      if (player1 !== null) {
+      if (player1 !== leavePlayer) {
         UpdatePlayer(player1, true);
       }
 
       const player2 = room.rows[0].r_player2;
-      if (player2 !== null) {
+      if (player2 !== leavePlayer) {
         UpdatePlayer(player2, true);
       }
     }
@@ -240,6 +342,7 @@ async function UpdatePlayer(u_name, isWin) {
       await client.query(p2UpdateQuery, [u_name]);
     }
     CheckLevelup(u_name);
+    ReloadRanking();
 
   } catch (err) {
 
@@ -248,8 +351,6 @@ async function UpdatePlayer(u_name, isWin) {
 
 async function CheckLevelup(u_name) {
   try {
-    console.log(u_name);
-
     const userQuery = `
     select "u_level", "u_exp"
     from "User"
@@ -279,6 +380,28 @@ async function CheckLevelup(u_name) {
   }
 }
 
+async function ReloadRanking() {
+  try {
+    const rankingQuery = `
+    update "User" u
+    set "u_ranking" = ranked.rank
+    from (
+      select
+        u_id,
+        dense_rank() over (
+          order by u_win desc, u_lose asc, u_draw desc
+        ) as rank
+      from "User"
+    ) ranked
+    where u.u_id = ranked.u_id;`;
+    await client.query(rankingQuery);
+
+  } catch (err) {
+    console.error("CheckRanking Error:", err);
+    throw err;
+  }
+}
+
 const app = express();
 app.use(cors({ origin: "http://localhost:4000", credentials: true }));
 app.use(express.json());
@@ -288,8 +411,8 @@ const client = new Client({
   host: "127.0.0.1",
   database: "Test_db",
   password: "1234",
-  port: 5432, /* 집 */
-  // port: 5433, /* 회사 */
+  // port: 5432, /* 집 */
+  port: 5433, /* 회사 */
 });
 client.connect();
 
@@ -588,9 +711,9 @@ app.post('/OutGame', async (req, res) => {
   }
 
   try {
-    console.log("Out user is", req.user?.u_name);
-    const result = await EndGame(r_id, req.user?.u_name);
-    if (result == true) io.to(r_id).emit("ended", false);
+    const u_name = req.user?.u_name;
+    const result = await EndGame(r_id, u_name, u_name);
+    if (result == true) io.to(r_id).emit("ended");
     res.status(200).send('ok');
 
   } catch {
@@ -756,11 +879,6 @@ io.on("connection", async (socket) => {
       returning *;`;
       const result = await client.query(playerJoinQuery, [u_name, r_id, u_name]);
 
-      if (!socket.data.datas || !socket.data.datas.u_name) {
-        console.log("⚠ selectZone arrived before auth finished");
-        return;
-      }
-
       if (result.rowCount === 0) {
         console.log("You can't join!");
         return socket.emit("playerError", { message: "playerJoin failed" });
@@ -823,6 +941,19 @@ io.on("connection", async (socket) => {
     }
 
     try {
+      if (is_ready) {
+        const isPlayingQuery = `
+        select "b_isPlaying"
+        from "Board"
+        where "r_id" = $1;`;
+        const isPlaying = await client.query(isPlayingQuery, [r_id]);
+
+        if (isPlaying.rows[0]) {
+          socket.emit("cantReady");
+          return;
+        }
+      }
+
       const playerColumn = p_num === 1 ? "r_player1" : "r_player2";
       const readyColumn = p_num === 1 ? "r_p1Ready" : "r_p2Ready";
 
@@ -834,6 +965,7 @@ io.on("connection", async (socket) => {
       returning *;`;
       const result = await client.query(playerReadyQuery,
         [is_ready, r_id, u_name]);
+
 
       if (result.rows[0]) {
         const playerQuery = `
@@ -858,6 +990,42 @@ io.on("connection", async (socket) => {
     }
   });
 
+  socket.on("sendMessage", async ({ r_id, message, isEvent }) => {
+    const { u_name } = socket.data.datas;
+
+    try {
+      const insertQuery = `
+      insert into "Chat" ("r_id", "c_sender", "c_text", "c_isEvent")
+      values ($1, $2, $3, $4);`;
+      await client.query(insertQuery,
+        [r_id, u_name, message, isEvent]);
+
+      const trimQuery = `
+      delete from "Chat" 
+      where "c_index" not in ( 
+      select "c_index" 
+      from "Chat" 
+      where "r_id" = $1 
+      order by "c_created" desc 
+      limit 30) 
+      and "r_id" = $1;`;
+      await client.query(trimQuery, [r_id]);
+
+      io.to(r_id).emit("newMessage", {
+        c_sender: u_name,
+        c_text: message,
+        c_created: new Date().toISOString(),
+        c_isEvent: isEvent,
+      });
+
+      console.log("newMessage is", { u_name, message });
+
+    } catch (err) {
+      console.error("sendMessage error:", err);
+      socket.emit("chatError", { message: "Failed send message" });
+    }
+  });
+
   socket.on("successStart", async ({ r_id }) => {
     try {
       const roomQuery = `
@@ -868,15 +1036,17 @@ io.on("connection", async (socket) => {
       const { r_player1, r_player2 } = room.rows[0];
 
       const zonesQuery = `
-      select "b_zones", "b_turn"
+      select "b_zones", "b_turn", "b_isPlaying"
       from "Board"
       where "r_id" = $1;`
       const zones = await client.query(zonesQuery, [r_id]);
+      const zonesData = zones.rows[0];
 
       socket.emit("makeBoard", {
         b_player1: r_player1, b_player2: r_player2,
-        zonesState: zones.rows[0].b_zones,
-        turnState: zones.rows[0].b_turn
+        zonesState: zonesData.b_zones,
+        turnState: zonesData.b_turn,
+        b_isPlaying: zonesData.b_isPlaying
       });
 
     } catch (err) {
@@ -896,7 +1066,6 @@ io.on("connection", async (socket) => {
       and ${curPlayerColumn} = $3;`;
       const result = await client.query(checkZoneQuery, [index, r_id, u_name]);
 
-      console.log(result.rows[0]);
       if (result.rowCount === 0) {
         console.log("This is not the player.");
         return;
@@ -927,42 +1096,9 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("sendMessage", async ({ r_id, message, isEvent }) => {
+  socket.on("endedGame", async ({ r_id, winner, loser }) => {
     const { u_name } = socket.data.datas;
 
-    try {
-      const insertQuery = `
-      insert into "Chat" ("r_id", "c_sender", "c_text", "c_isEvent")
-      values ($1, $2, $3, $4);`;
-      await client.query(insertQuery, [r_id, u_name, message, isEvent]);
-
-      const trimQuery = `
-      delete from "Chat" 
-      where "c_index" not in ( 
-      select "c_index" 
-      from "Chat" 
-      where "r_id" = $1 
-      order by "c_created" desc 
-      limit 30) 
-      and "r_id" = $1;`;
-      await client.query(trimQuery, [r_id]);
-
-      io.to(r_id).emit("newMessage", {
-        c_sender: u_name,
-        c_text: message,
-        c_created: new Date().toISOString(),
-        c_isEvent: isEvent,
-      });
-
-      console.log("newMessage is", { u_name, message });
-
-    } catch (err) {
-      console.error("sendMessage error:", err);
-      socket.emit("chatError", { message: "Failed send message" });
-    }
-  });
-
-  socket.on("endedGame", async ({ r_id, winner, loser }) => {
     try {
       const endedQuery = `
       update "Board"
@@ -970,10 +1106,8 @@ io.on("connection", async (socket) => {
       where "r_id" = $1;`
       await client.query(endedQuery, [r_id]);
 
-      UpdatePlayer(winner, true);
-      UpdatePlayer(loser, false);
-
-      // 랭킹 로직 추가해야 함!
+      if (u_name === winner) UpdatePlayer(winner, true);
+      else UpdatePlayer(loser, false);
 
     } catch (err) {
       console.error("endedGame error:", err);
@@ -1019,12 +1153,12 @@ io.on("connection", async (socket) => {
         const players = await client.query(playersQuery, [r_id]);
 
         if (players.rowCount !== 0) {
-          EndGame(r_id, u_name);
-          io.to(r_id).emit("ended", false);
+          EndGame(r_id, u_name, null);
+          io.to(r_id).emit("ended");
         }
       }
 
-      socket.emit("ended", true);
+      socket.emit("ended");
 
     } catch (err) {
 
@@ -1035,90 +1169,8 @@ io.on("connection", async (socket) => {
     const { u_id, u_name } = socket.data.datas;
 
     try {
-      const roomQuery = `
-      update "Room" 
-      set "r_players" = "r_players" - 1
-      where "r_id" = $1
-      returning *;`;
-      const room = await client.query(roomQuery, [r_id]);
-      const roomData = room.rows[0];
-      var player1 = roomData.r_player1;
-      var player2 = roomData.r_player2;
-      var p1Ready = true;
-      var p2Ready = true;
-
-      if (player1 == u_name) {
-        CancleReady(r_id, 1, u_name, false);
-        player1 = null;
-      }
-      if (player2 == u_name) {
-        CancleReady(r_id, 2, u_name, false);
-        player2 = null;
-      }
-
-      const userRoomQuery = `
-      update "UserRoom" 
-      set "r_id" = null
-      where "u_id" = $1;`;
-      await client.query(userRoomQuery, [u_id]);
-
-      const leavePlayerQuery = `
-      update "Room"
-      set "r_player1" = $1,
-          "r_player2" = $2
-      where "r_id" = $3;`;
-      await client.query(leavePlayerQuery,
-        [player1, player2, r_id]);
-
-      if (player1 && roomData.r_p1Ready) p1Ready = true;
-      else p1Ready = false;
-
-      if (player2  && roomData.r_p2Ready) p2Ready = true;
-      else p2Ready = false;
-
-      const readyQuery = `
-      update "Room"
-      set "r_p1Ready" = $1,
-          "r_p2Ready" = $2
-      where "r_id" = $3;`;
-      await client.query(readyQuery,
-        [p1Ready, p2Ready, r_id]);
-
-      if (roomData.r_players < 1) {
-        await client.query(`
-        delete from "Room" 
-        where "r_id" = $1;`, [r_id]);
-        console.log(`Remove room (${r_id})`);
-        RefreshRoomList();
-        return;
-      }
-
-      const p1Query = `
-      select *
-      from "User"
-      where u_name = $1;`;
-      const p1 = await client.query(p1Query, [player1]);
-
-      const p2Query = `
-      select *
-      from "User"
-      where u_name = $1;`;
-      const p2 = await client.query(p2Query, [player2]);
-
-      if (roomData) {
-        io.to(r_id).emit("roomUpdate", {
-          room: roomData, p1: p1.rows[0], p2: p2.rows[0],
-          p1_ready: p1Ready, p2_ready: p2Ready
-        });
-      }
-
-      // 추후에 추가
-      console.log(`left ${u_name} room (${r_id})`);
-
+      LeaveRoomPlayer(r_id, u_id, u_name);
       socket.leave(r_id);
-      console.log(`left room (${r_id})`);
-
-      await RefreshRoomList(null);
 
     } catch (err) {
       console.error("leaveRoom Error:", err);
@@ -1131,17 +1183,25 @@ io.on("connection", async (socket) => {
       return;
     }
 
-    const { u_id } = socket.data.datas;
+    const { u_id, u_name } = socket.data.datas;
 
     setTimeout(async () => {
       const stillOnline = [...io.sockets.sockets.values()]
         .some(s => s.data?.datas?.u_id === u_id);
 
       if (!stillOnline) {
-        await client.query(`
+        const userQuery = `
         update "User"
         set "u_logined" = false
-        where "u_id" = $1`, [u_id]);
+        where "u_id" = $1;`
+        await client.query(userQuery, [u_id]);
+
+        const userRoomQuery = `
+        select "r_id"
+        from "UserRoom"
+        where "u_id" = $1;`;
+        const userRoom = await client.query(userRoomQuery, [u_id]);
+        if (userRoom.rows[0].r_id !== null) LeaveRoomPlayer(userRoom.rows[0].r_id, u_id, u_name);
 
         console.log(`${u_id} logouted`);
       }

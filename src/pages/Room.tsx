@@ -4,7 +4,7 @@ import { ReloadToken, socket } from "../socket";
 import { UserInfo } from "../pages/Home";
 import { motion, AnimatePresence } from "framer-motion";
 import Board from '../components/Board';
-import ChatBox  from "../components/ChatBox";
+import ChatBox from "../components/ChatBox";
 
 import "../styles/Room.css";
 
@@ -21,10 +21,10 @@ export interface RoomInfo {
 }
 
 export interface ChatMessage {
-    c_sender: string;
-    c_text: string;
-    c_created: string;
-    c_isEvent: boolean;
+  c_sender: string;
+  c_text: string;
+  c_created: string;
+  c_isEvent: boolean;
 }
 
 const Room: React.FC = () => {
@@ -43,7 +43,6 @@ const Room: React.FC = () => {
   useEffect(() => {
     if (!token || !token.includes(".")) {
       alert("Wrong token!");
-      console.log("Wrong token!");
       navigate("/home");
       return;
     }
@@ -55,8 +54,25 @@ const Room: React.FC = () => {
     }
 
     const r_id = sessionStorage.getItem("currentRoom");
+    if (!r_id) {
+      alert("Wrong approach!");
+      navigate("/home");
+    }
     socket.emit("sendMessage",
       { r_id: r_id, message: "entered", isEvent: true });
+
+    socket.on("roomUpdate", ({ room, p1, p2, p1_ready, p2_ready }) => {
+      setRoomData(room);
+      setPlayer1(p1);
+      setPlayer2(p2);
+      setPlayer1State({ joined: p1 != null, ready: p1_ready });
+      setPlayer2State({ joined: p2 != null, ready: p2_ready });
+    });
+
+    socket.on("roomError", (msg) => {
+      alert(msg.message);
+      console.error("Room error:", msg);
+    });
 
     socket.on("playerUpdate", ({ player, p_num, is_join, is_ready }) => {
       if (p_num === 1) {
@@ -72,17 +88,8 @@ const Room: React.FC = () => {
       console.error("Player error:", msg);
     });
 
-    socket.on("roomUpdate", ({ room, p1, p2, p1_ready, p2_ready }) => {
-      setRoomData(room);
-      setPlayer1(p1);
-      setPlayer2(p2);
-      setPlayer1State({ joined: p1 != null, ready: p1_ready });
-      setPlayer2State({ joined: p2 != null, ready: p2_ready });
-    });
-
-    socket.on("roomError", (msg) => {
-      alert(msg.message);
-      console.error("Room error:", msg);
+    socket.on("cantReady", () => {
+      alert("opponent didn't leave the game.");
     });
 
     socket.on("loadChat", (history: ChatMessage[]) => {
@@ -94,7 +101,6 @@ const Room: React.FC = () => {
       console.log("newMessage:", message);
       console.log("Currnet messages:", messages);
     });
-
 
     socket.on("countdown", ({ seconds }) => {
       setRoomState(seconds);
@@ -109,19 +115,18 @@ const Room: React.FC = () => {
       setStarted(true);
       const r_id = sessionStorage.getItem("currentRoom");
       socket.emit("successStart", { r_id: r_id });
-      console.log("started r_id:",r_id);
+      console.log("started r_id:", r_id);
     });
 
-    socket.on("ended", (isGameEnd: boolean) => {
+    socket.on("ended", () => {
       setStarted(false);
-      if (isGameEnd) {
-        handlePlayerReady(1, false);
-        handlePlayerReady(2, false);
-      }
+      handlePlayerReady(1, false);
+      handlePlayerReady(2, false);
     });
 
     return () => {
       const r_id = sessionStorage.getItem("currentRoom");
+      if (!r_id) return;
       OutGame(r_id);
       socket.emit("sendMessage",
         { r_id: r_id, message: "left", isEvent: true });
@@ -130,8 +135,10 @@ const Room: React.FC = () => {
       socket.off("started");
       socket.off("cancleCountdown");
       socket.off("countdown");
-      socket.off("loadChat");
+      socket.off("leaveMessage");
       socket.off("newMessage");
+      socket.off("loadChat");
+      socket.off("cantReady");
       socket.off("playerError");
       socket.off("playerUpdate");
       socket.off("roomError");
