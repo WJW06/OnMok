@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { socket } from "../socket";
+import WinnerOverlay from "../components/WinnerOverlay"
 import '../styles/Board.css';
 import '../styles/Board-responsive.css';
 
@@ -19,6 +20,8 @@ const Board: React.FC = () => {
   let player1Count = useRef(0);
   let player2Zones = useRef(Array<boolean>(rcCount * rcCount).fill(false));
   let player2Count = useRef(0);
+  const [winnerMessage, setWinnerMessage] = useState<string | null>(null);
+
   useEffect(() => {
     fetch("http://localhost:5000/Ground")
       .then((res) => res.json())
@@ -38,14 +41,9 @@ const Board: React.FC = () => {
       setZones(b_zones);
     });
 
-    socket.on("forceWin", ({ leavePlayer }) => {
-      CheckWinner(leavePlayer);
-    });
-
     return () => {
       socket.off("makeBoard");
       socket.off("placeZone");
-      socket.off("forceWin");
     }
   }, []);
 
@@ -151,11 +149,11 @@ const Board: React.FC = () => {
 
     if (turn.current % 2 === 0) {
       player1Zones.current[index] = true;
-      if (++player1Count.current > 4) CheckWinner(0);
+      if (++player1Count.current > 4) CheckWinner();
     }
     else {
       player2Zones.current[index] = true;
-      if (++player2Count.current > 4) CheckWinner(0);
+      if (++player2Count.current > 4) CheckWinner();
     }
     ++turn.current;
 
@@ -281,24 +279,23 @@ const Board: React.FC = () => {
     else return 0;
   }
 
-  function CheckWinner(leavePlayer: number) {
-    console.log("Checking Winner...");
+  function CheckWinner() {
     const winner: number = CheckLine();
 
-    if (winner !== 0 || leavePlayer !== 0) {
+    if (winner !== 0) {
       const startButton = document.querySelector('.start-button');
       if (startButton instanceof HTMLButtonElement) {
         console.log("startButton none");
         startButton.style.display = 'none';
       }
 
-      if (winner === 1 || leavePlayer == 2) {
-        alert(`Winner:${player1.current}!`);
+      if (winner === 1) {
+        setWinnerMessage(`${player1.current} Win!`);
         handleEndedGame(player1.current, player2.current);
       }
 
-      if (winner === 2 || leavePlayer == 1) {
-        alert(`Winner:${player2.current}!`);
+      if (winner === 2) {
+        setWinnerMessage(`${player2.current} Win!`);
         handleEndedGame(player2.current, player1.current);
       }
 
@@ -334,6 +331,12 @@ const Board: React.FC = () => {
         <MakeRowZones offset={16}></MakeRowZones>
         <MakeRowZones offset={17}></MakeRowZones>
       </div>
+
+      {winnerMessage && (
+        <WinnerOverlay
+          message={winnerMessage}
+          onFinish={() => setWinnerMessage(null)}
+        />)}
     </>
   );
 }
