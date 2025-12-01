@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ReloadToken, socket } from "../socket";
 import '../styles/Login.css'
@@ -32,6 +32,7 @@ const Login: React.FC = () => {
             const newToken = String(data.token);
             localStorage.setItem("token", newToken);
             ReloadToken(newToken);
+            window.playMainBGM(); 
             navigate('/Home');
         }
         else {

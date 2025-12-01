@@ -7,7 +7,7 @@ const Sign_up: React.FC = () => {
         fetch("http://localhost:5000/Sign_up")
             .then((res) => res.json())
             .then((data) => { console.log(data) })
-    });
+    }, []);
 
     const [u_id, setU_id] = useState("");
     const [u_password, setU_password] = useState("");

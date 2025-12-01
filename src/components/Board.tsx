@@ -34,16 +34,19 @@ const Board: React.FC = () => {
       isPlaying.current = b_isPlaying;
       setZones(zonesState);
       InitGameState(zonesState);
+      window.playGameBGM();
     });
 
     socket.on("placeZone", ({ b_zones, index }) => {
       SelectZone(index);
       setZones(b_zones);
+      window.playPlaceSound();
     });
 
     return () => {
       socket.off("makeBoard");
       socket.off("placeZone");
+      window.playMainBGM();
     }
   }, []);
 
