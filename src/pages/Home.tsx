@@ -4,7 +4,7 @@ import RoomBox from "../components/RoomBox";
 import PasswordModal from "../components/PasswordModal";
 import SettingsModal from "../components/SettingModal";
 import CreateBoxModal from "../components/CreateBoxModal";
-import { RoomInfo } from "../pages/Room";
+import { RoomInfo } from "./Room";
 import { ReloadToken, socket } from "../socket";
 import "../styles/Home.css";
 

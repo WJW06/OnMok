@@ -398,22 +398,53 @@ async function ReloadRanking() {
 
   } catch (err) {
     console.error("CheckRanking Error:", err);
-    throw err;
   }
+  throw err;
 }
 
 const app = express();
-app.use(cors({ origin: "http://localhost:4000", credentials: true }));
 app.use(express.json());
 
+// // [Local]
+// app.use(cors({ origin: "http://localhost:4000", credentials: true }));
+
+// const client = new Client({
+//   user: "Test_user",
+//   host: "127.0.0.1",
+//   database: "Test_db",
+//   password: "1234",
+//   port: 5432, /* 집 */
+//   // port: 5433, /* 회사 */
+// });
+
+// [Online]
+app.use(express.static("build"));
+app.use(cors({ 
+  origin: (origin, callback) => {
+    const allowed = [
+      "http://localhost:4000",
+    ];
+
+    const ngrokRegex = /\.ngrok-free\.app$/;
+
+    if (!origin || allowed.includes(origin) || ngrokRegex.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+}));
+app.listen(process.env.PORT, "0.0.0.0");
+
 const client = new Client({
-  user: "Test_user",
-  host: "127.0.0.1",
-  database: "Test_db",
-  password: "1234",
-  port: 5432, /* 집 */
-  // port: 5433, /* 회사 */
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT,
 });
+
 client.connect();
 
 app.get("/", async (req, res) => {
@@ -722,11 +753,22 @@ app.post('/OutGame', async (req, res) => {
 });
 
 /* Socket.io */
-
 const server = http.createServer(app);
+
+// // [Local]
+// const io = new Server(server, {
+//   cors: {
+//     origin: "http://localhost:4000",
+//     methods: ["GET", "POST"],
+//     credentials: true,
+//   },
+// });
+
+// [Online]
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:4000",
+    origin: ["http://localhost:4000",
+      "/\.ngrok-free\.app$/",],
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -1209,6 +1251,10 @@ io.on("connection", async (socket) => {
   });
 });
 
-server.listen(5000, () => {
-  console.log("Socket running on http://localhost:5000")
-});
+// // [Local]
+// server.listen(5000, () => {
+//   console.log("Socket running on http://localhost:5000")
+// });
+
+// [Online]
+server.listen(5000, "0,0,0,0");

@@ -1,6 +1,14 @@
 import { io } from "socket.io-client";
 
-export const socket = io("http://localhost:5000", {
+// // [Local]
+// export const socket = io("http://localhost:5000", {
+//     transports: ["websocket"],
+//     withCredentials: true,
+//     autoConnect: false,
+// });
+
+// [Online]
+export const socket = io("https://unpermanent-ara-unostensive.ngrok-free.dev", {
     transports: ["websocket"],
     withCredentials: true,
     autoConnect: false,

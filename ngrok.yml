@@ -1,0 +1,6 @@
+authtoken: ${NGROK_AUTHTOKEN}
+
+tunnels:
+  web:
+    proto: http
+    addr: backend:2000

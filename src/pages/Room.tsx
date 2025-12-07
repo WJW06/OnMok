@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ReloadToken, socket } from "../socket";
-import { UserInfo } from "../pages/Home";
+import { UserInfo } from "./Home";
 import { motion, AnimatePresence } from "framer-motion";
 import Board from '../components/Board';
 import ChatBox from "../components/ChatBox";

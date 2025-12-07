@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { socket } from "../socket";
-import WinnerOverlay from "../components/WinnerOverlay"
+import WinnerOverlay from "./WinnerOverlay"
 import '../styles/Board.css';
 import '../styles/Board-responsive.css';
 

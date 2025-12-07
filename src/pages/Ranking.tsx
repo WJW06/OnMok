@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PlayerRank from "../components/PlayerRank";
-import { UserInfo } from "../pages/Home";
+import { UserInfo } from "./Home";
 import "../styles/Ranking.css";
 
 const Ranking: React.FC = () => {
