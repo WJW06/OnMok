@@ -1,18 +1,18 @@
 import { io } from "socket.io-client";
 
-// // [Local]
-// export const socket = io("http://localhost:5000", {
-//     transports: ["websocket"],
-//     withCredentials: true,
-//     autoConnect: false,
-// });
-
-// [Online]
-export const socket = io("https://unpermanent-ara-unostensive.ngrok-free.dev", {
+// [Local]
+export const socket = io("http://localhost:5000", {
     transports: ["websocket"],
     withCredentials: true,
     autoConnect: false,
 });
+
+// // [Online]
+// export const socket = io("https://unpermanent-ara-unostensive.ngrok-free.dev", {
+//     transports: ["websocket"],
+//     withCredentials: true,
+//     autoConnect: false,
+// });
 
 let navigateFn: ((path: string) => void) | null = null;
 

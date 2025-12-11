@@ -14,13 +14,12 @@ services:
       context: .
       dockerfile: ./backend/Dockerfile
     ports:
-      - "2000:2000"   # Express
-      - "5000:5000"   # Socket.IO
+      - "2000:2000" # Express
+      - "5000:5000" # Socket.IO
     extra_hosts:
       - "host.docker.internal:host-gateway"
     container_name: backend
     environment:
-      - PORT=${PORT}
       - DB_HOST=${DB_HOST}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}

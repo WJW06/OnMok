@@ -58,7 +58,7 @@ const Room: React.FC = () => {
       alert("Wrong approach!");
       navigate("/home");
     }
-    
+
     socket.emit("sendMessage",
       { r_id: r_id, message: "entered", isEvent: true });
 

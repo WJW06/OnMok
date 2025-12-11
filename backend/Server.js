@@ -398,58 +398,66 @@ async function ReloadRanking() {
 
   } catch (err) {
     console.error("CheckRanking Error:", err);
+    throw err;
   }
-  throw err;
 }
 
 const app = express();
 app.use(express.json());
 
-// // [Local]
-// app.use(cors({ origin: "http://localhost:4000", credentials: true }));
-
-// const client = new Client({
-//   user: "Test_user",
-//   host: "127.0.0.1",
-//   database: "Test_db",
-//   password: "1234",
-//   port: 5432, /* 집 */
-//   // port: 5433, /* 회사 */
-// });
-
-// [Online]
-app.use(express.static("build"));
-app.use(cors({ 
-  origin: (origin, callback) => {
-    const allowed = [
-      "http://localhost:4000",
-    ];
-
-    const ngrokRegex = /\.ngrok-free\.app$/;
-
-    if (!origin || allowed.includes(origin) || ngrokRegex.test(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-}));
-app.listen(process.env.PORT, "0.0.0.0");
+// [Local]
+app.use(cors({ origin: "http://localhost:4000", credentials: true }));
 
 const client = new Client({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
+  user: "Test_user",
+  host: "127.0.0.1",
+  database: "Test_db",
+  password: "1234",
+  // port: 5432, /* 집 */
+  port: 5433, /* 회사 */
 });
+
+// // [Online]
+// app.use(express.static("build"));
+// app.use(cors({ 
+//   origin: (origin, callback) => {
+//     const allowed = [
+//       "http://localhost:4000",
+//     ];
+
+//     const ngrokRegex = /\.ngrok-free\.app$/;
+
+//     if (!origin || allowed.includes(origin) || ngrokRegex.test(origin)) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error("Not allowed by CORS"));
+//     }
+//   },
+//   credentials: true,
+// }));
+// app.listen(process.env.PORT, "0.0.0.0");
+
+// const client = new Client({
+//   host: process.env.DB_HOST,
+//   user: process.env.DB_USER,
+//   password: process.env.DB_PASSWORD,
+//   database: process.env.DB_NAME,
+//   port: process.env.DB_PORT,
+// });
 
 client.connect();
 
 app.get("/", async (req, res) => {
   try {
     console.log("Enter Login page");
+
+    const browserId = req.cookies.browserId;
+    if (!browserId) {
+      const newId = crypto.randomUUID();
+      res.cookie("browserId", newId, { httpOnly: true, maxAge: 365 * 24 * 60 * 60 * 1000 });
+      return res.json({ browserId: newId });
+    }
+    res.json({ browserId });
 
   } catch (err) {
     console.error(err);
@@ -512,7 +520,7 @@ app.get("/GetRankingInfo", async (req, res) => {
 
 app.get("/Ground", async (req, res) => {
   try {
-    const result = await client.query("select now()");
+    const result = await client.query("select now();");
     console.log("Enter game");
     res.json(result.rows[0]);
 
@@ -524,6 +532,22 @@ app.get("/Ground", async (req, res) => {
 
 app.post("/Login", async (req, res) => {
   const { u_id, u_password } = req.body;
+
+  // const { browserId } = req.cookies;
+  // if (!browserId) return res.status(400).json({ success: false, message: "Not find Browser ID." });
+
+  // const loginTable = await client.query(`
+  //   select * 
+  //   from "BrowserLogin"
+  //   where "l_browserID" = $1`, [browserId]);
+  // const failCount = loginTable.rows[0].l_count;
+  // const block = loginTable.rows[0].l_block;
+  // if (block && Date.now() < Number(block)) {
+  //   return res.json({
+  //     success: false,
+  //     message: "You have failed to log in more than 5 times. Please try again in 24 hours."
+  //   });
+  // }
 
   try {
     const userQuery = `
@@ -569,11 +593,12 @@ app.post("/Sign_up", async (req, res) => {
   const { u_id, u_password, u_name } = req.body;
 
   try {
+    const userCount = await client.query(`select count(*) from "User";`);
     const userQuery = `
-    insert into "User"("u_id", "u_password", "u_name") 
-    values($1, $2, $3) 
+    insert into "User"("u_id", "u_password", "u_name", "u_ranking") 
+    values($1, $2, $3, $4) 
     returning *`;
-    const values = [u_id, u_password, u_name];
+    const values = [u_id, u_password, u_name, userCount.rows[0].count + 1];
     const result = await client.query(userQuery, values);
     await client.query(`
       insert into "UserRoom" 
@@ -755,24 +780,24 @@ app.post('/OutGame', async (req, res) => {
 /* Socket.io */
 const server = http.createServer(app);
 
-// // [Local]
-// const io = new Server(server, {
-//   cors: {
-//     origin: "http://localhost:4000",
-//     methods: ["GET", "POST"],
-//     credentials: true,
-//   },
-// });
-
-// [Online]
+// [Local]
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:4000",
-      "/\.ngrok-free\.app$/",],
+    origin: "http://localhost:4000",
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
+
+// // [Online]
+// const io = new Server(server, {
+//   cors: {
+//     origin: ["http://localhost:4000",
+//       "/\.ngrok-free\.app$/",],
+//     methods: ["GET", "POST"],
+//     credentials: true,
+//   },
+// });
 
 io.use((socket, next) => {
   const authHeader = socket.handshake.auth?.token
@@ -1251,10 +1276,10 @@ io.on("connection", async (socket) => {
   });
 });
 
-// // [Local]
-// server.listen(5000, () => {
-//   console.log("Socket running on http://localhost:5000")
-// });
+// [Local]
+server.listen(5000, () => {
+  console.log("Socket running on http://localhost:5000")
+});
 
-// [Online]
-server.listen(5000, "0,0,0,0");
+// // [Online]
+// server.listen(5000, "0,0,0,0");

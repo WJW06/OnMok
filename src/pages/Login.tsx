@@ -32,11 +32,12 @@ const Login: React.FC = () => {
             const newToken = String(data.token);
             localStorage.setItem("token", newToken);
             ReloadToken(newToken);
-            window.playMainBGM(); 
+            window.playMainBGM();
             navigate('/Home');
         }
         else {
             alert(data.message);
+
         }
     };
 
