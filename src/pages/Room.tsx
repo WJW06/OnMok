@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ReloadToken, socket } from "../socket";
 import { UserInfo } from "./Home";
 import { motion, AnimatePresence } from "framer-motion";
+import { ReloadToken, socket } from "../socket";
+import { LeaveRoomApi } from "../express";
 import Board from '../components/Board';
 import ChatBox from "../components/ChatBox";
 
@@ -151,15 +152,7 @@ const Room: React.FC = () => {
 
   const handleExit = async () => {
     try {
-      const res = await fetch("http://localhost:5000/LeaveRoom", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await res.json();
+      const data = await LeaveRoomApi(token);
       if (data.success) {
         localStorage.setItem("token", data.token);
         ReloadToken(data.token);

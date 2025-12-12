@@ -4,13 +4,64 @@ const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
+const crypto = require("crypto");
 require('dotenv').config();
-const SECRET_KEY = process.env.SECRET_KEY;
 
+const SECRET_KEY = process.env.SECRET_KEY;
 if (!SECRET_KEY) {
   console.error("ERROR: SECRET_KEY is not set. Set it in .env or environment variables.");
   process.exit(1);
 }
+
+const app = express();
+app.use(express.json());
+app.use(cookieParser());
+
+// [Local]
+app.use(cors({ origin: "http://localhost:2000", credentials: true }));
+
+const client = new Client({
+  user: "Test_user",
+  host: "127.0.0.1",
+  database: "Test_db",
+  password: "1234",
+  port: 5432, /* 집 */
+  // port: 5433, /* 회사 */
+});
+
+// // [Online]
+// app.use(express.static("build"));
+// app.use(cors({ 
+//   origin: (origin, callback) => {
+//     const allowed = [
+//       "http://localhost:2000",
+//     ];
+
+//     const ngrokRegex = /\.ngrok-free\.app$/;
+
+//     if (!origin || allowed.includes(origin) || ngrokRegex.test(origin)) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error("Not allowed by CORS"));
+//     }
+//   },
+//   credentials: true,
+// }));
+// app.listen(process.env.PORT, "0.0.0.0");
+
+// const client = new Client({
+//   host: process.env.DB_HOST,
+//   user: process.env.DB_USER,
+//   password: process.env.DB_PASSWORD,
+//   database: process.env.DB_NAME,
+//   port: process.env.DB_PORT,
+// });
+
+client.connect();
+
+const roomsState = new Map();
+const countdowns = new Map();
 
 function AuthMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(" ")[1];
@@ -21,6 +72,40 @@ function AuthMiddleware(req, res, next) {
     next();
   } catch (err) {
     res.status(401).json({ success: false, message: "Invalid token" });
+  }
+}
+
+function GetFingerprint(req) {
+  const ip = req.ip;
+  const ua = req.headers["user-agent"] || "";
+  const lang = req.headers["accept-language"] || "";
+
+  return crypto
+    .createHash("sha256")
+    .update(ip + ua + lang)
+    .digest("hex");
+}
+
+async function UpdateLoginTable(id, failCount){
+  try{
+    if (failCount >= 5){
+      const blockTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await client.query(`
+      update "Login"
+      set "l_count" = $1,
+          "l_block" = $2
+      where "l_id" = $3;`, [failCount, blockTime, id]);
+      return;
+    }
+
+    await client.query(`
+    update "Login"
+    set "l_count" = $1
+    where "l_id" = $2;`, [failCount, id]);
+
+  } catch (err){
+    console.error("UpdateLoginTable Error:", err);
+    throw err;
   }
 }
 
@@ -111,8 +196,9 @@ async function LeaveRoomPlayer(r_id, u_id, u_name) {
       await client.query(`
       delete from "Room" 
       where "r_id" = $1;`, [r_id]);
-      console.log(`Remove room (${r_id})`);
+      roomsState.delete(r_id);
       await RefreshRoomList();
+      console.log(`Remove room (${r_id})`);
       return;
     }
 
@@ -155,10 +241,9 @@ async function LeaveRoomPlayer(r_id, u_id, u_name) {
     await RefreshRoomList(null);
   } catch (err) {
     console.error("LeaveRoomPlayer Error:", err);
+    throw err;
   }
 }
-
-const countdowns = new Map();
 
 async function CheckReadys(socket, r_id) {
   try {
@@ -192,8 +277,9 @@ async function CheckReadys(socket, r_id) {
     }
 
   } catch (err) {
-    console.error("CheckReadys Error:", err);
     socket.emit("ReadysError", { message: "CheckReadys failed" });
+    console.error("CheckReadys Error:", err);
+    throw err;
   }
 }
 
@@ -234,8 +320,9 @@ async function CancleReady(r_id, p_num, u_name, is_join) {
     }
 
   } catch (err) {
-    console.error("CancleReady Error:", err);
     socket.emit("CancleError", { message: "CancleReady failed" });
+    console.error("CancleReady Error:", err);
+    throw err;
   }
 }
 
@@ -277,8 +364,25 @@ async function StartGame(r_id) {
 
   } catch (err) {
     console.error("StartGame Error:", err);
+    throw err;
   }
 }
+
+async function StartTurnTimer(r_id) {
+  console.log("Start Timer");
+  const room = roomsState.get(r_id);
+  if (!room) return;
+
+  const { turnTime } = room;
+  if (room.timer) clearTimeout(room.timer);
+
+  room.timer = setTimeout(() => {
+    io.to(r_id).emit("timeout");
+
+    console.log(`[TIMEOUT] Room ${r_id}`);
+  }, turnTime * 1000);
+}
+
 
 async function EndGame(r_id, leaveUser, leavePlayer) {
   try {
@@ -345,7 +449,8 @@ async function UpdatePlayer(u_name, isWin) {
     ReloadRanking();
 
   } catch (err) {
-
+    console.error("UpdatePlayer Error:", err);
+    throw err;
   }
 }
 
@@ -402,62 +507,9 @@ async function ReloadRanking() {
   }
 }
 
-const app = express();
-app.use(express.json());
-
-// [Local]
-app.use(cors({ origin: "http://localhost:4000", credentials: true }));
-
-const client = new Client({
-  user: "Test_user",
-  host: "127.0.0.1",
-  database: "Test_db",
-  password: "1234",
-  // port: 5432, /* 집 */
-  port: 5433, /* 회사 */
-});
-
-// // [Online]
-// app.use(express.static("build"));
-// app.use(cors({ 
-//   origin: (origin, callback) => {
-//     const allowed = [
-//       "http://localhost:4000",
-//     ];
-
-//     const ngrokRegex = /\.ngrok-free\.app$/;
-
-//     if (!origin || allowed.includes(origin) || ngrokRegex.test(origin)) {
-//       callback(null, true);
-//     } else {
-//       callback(new Error("Not allowed by CORS"));
-//     }
-//   },
-//   credentials: true,
-// }));
-// app.listen(process.env.PORT, "0.0.0.0");
-
-// const client = new Client({
-//   host: process.env.DB_HOST,
-//   user: process.env.DB_USER,
-//   password: process.env.DB_PASSWORD,
-//   database: process.env.DB_NAME,
-//   port: process.env.DB_PORT,
-// });
-
-client.connect();
-
 app.get("/", async (req, res) => {
   try {
     console.log("Enter Login page");
-
-    const browserId = req.cookies.browserId;
-    if (!browserId) {
-      const newId = crypto.randomUUID();
-      res.cookie("browserId", newId, { httpOnly: true, maxAge: 365 * 24 * 60 * 60 * 1000 });
-      return res.json({ browserId: newId });
-    }
-    res.json({ browserId });
 
   } catch (err) {
     console.error(err);
@@ -486,6 +538,11 @@ app.get("/Sign_up", async (req, res) => {
 });
 
 app.get("/GetUserInfo", AuthMiddleware, async (req, res) => {
+  try{
+
+  } catch (err){
+
+  }
   const u_id = req.user.u_id;
   const user = await client.query(`
     select "u_name", "u_win", "u_lose", "u_draw", "u_level", "u_exp" 
@@ -518,36 +575,33 @@ app.get("/GetRankingInfo", async (req, res) => {
   }
 });
 
-app.get("/Ground", async (req, res) => {
-  try {
-    const result = await client.query("select now();");
-    console.log("Enter game");
-    res.json(result.rows[0]);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("DB error");
-  }
-});
-
 app.post("/Login", async (req, res) => {
   const { u_id, u_password } = req.body;
+  const l_id = GetFingerprint(req);
+  let loginTable = await client.query(`
+  select * 
+  from "Login"
+  where "l_id" = $1;`, [l_id]);
 
-  // const { browserId } = req.cookies;
-  // if (!browserId) return res.status(400).json({ success: false, message: "Not find Browser ID." });
+  if (loginTable.rowCount === 0) {
+  await client.query(`
+  insert into "Login"("l_id")
+  values ($1);`, [l_id]);
 
-  // const loginTable = await client.query(`
-  //   select * 
-  //   from "BrowserLogin"
-  //   where "l_browserID" = $1`, [browserId]);
-  // const failCount = loginTable.rows[0].l_count;
-  // const block = loginTable.rows[0].l_block;
-  // if (block && Date.now() < Number(block)) {
-  //   return res.json({
-  //     success: false,
-  //     message: "You have failed to log in more than 5 times. Please try again in 24 hours."
-  //   });
-  // }
+  loginTable = await client.query(`
+  select *
+  from "Login"
+  where "l_id" = $1;`, [l_id]);
+}
+
+  const block = loginTable.rows[0].l_block;
+  let failCount = loginTable.rows[0].l_count;
+  if (block && Date.now() < Number(block)) {
+    return res.json({
+      success: false,
+      message: "You have failed to log in more than 5 times. Please try again in 24 hours."
+    });
+  }
 
   try {
     const userQuery = `
@@ -557,11 +611,13 @@ app.post("/Login", async (req, res) => {
     const result = await client.query(userQuery, [u_id]);
 
     if (result.rowCount === 0) {
+      UpdateLoginTable(l_id, ++failCount);
       return res.status(401).json({ success: false, message: "This ID does not exist." });
     }
 
     const user = result.rows[0];
     if (user.u_password !== u_password) {
+      UpdateLoginTable(l_id, ++failCount);
       return res.status(401).json({ success: false, message: "The password is different." });
     }
 
@@ -572,7 +628,12 @@ app.post("/Login", async (req, res) => {
     await client.query(`
     update "User" 
     set "u_logined" = true 
-    where "u_id" = $1`, [u_id]);
+    where "u_id" = $1;`, [u_id]);
+
+    await client.query(`
+    delete
+    from "Login"
+    where "l_id" = $1;`, [l_id]);
 
     const token = jwt.sign(
       { u_id: user.u_id, u_name: user.u_name },
@@ -632,6 +693,8 @@ app.post("/SetUserInfo", AuthMiddleware, async (req, res) => {
 app.post("/CreateRoom", async (req, res) => {
   const { roomData } = req.body;
 
+  console.log(roomData);
+
   if (!roomData || !roomData.r_id) {
     return res.status(400).json({ success: false, message: "Invalid room data" });
   }
@@ -650,6 +713,15 @@ app.post("/CreateRoom", async (req, res) => {
       roomData.r_turnTime, roomData.r_isUndo];
     await client.query(roomQuery, values);
 
+    roomsState.set(roomData.r_id, {
+      players: roomData.r_players,
+      maxPlayers: roomData.r_maxPlayers,
+      r_roomMaster: roomData.r_roomMaster,
+      turnTime: roomData.r_turnTime,
+      timer: null,
+      isUndo: roomData.r_isUndo
+    })
+
     res.json({ success: true, message: "Success sign up!" });
 
   } catch (err) {
@@ -666,6 +738,11 @@ app.post("/RandomRoom", async (req, res) => {
     where "r_isLocked" = false 
     order by RANDOM() limit 1;`;
     const result = await client.query(randomQuery);
+    
+    if (result.rowCount === 0){
+      console.error("room does not exist");
+      return;
+    }
 
     res.json({ success: true, message: "Random join room.", room: result.rows[0] });
 
@@ -719,6 +796,16 @@ app.post("/JoinRoom", AuthMiddleware, async (req, res) => {
   }
 
   try {
+    const roomQuery = `
+    select *
+    from "Room"
+    where "r_id" = $1;`;
+    const room = await client.query(roomQuery, [r_id]);
+    const roomData = room.rows[0];
+    if (roomData.r_players >= roomData.r_maxPlayers){
+      return res.status(400).json({ success: false, message: "The place is full." });
+    }
+
     const { exp, ...userRest } = req.user;
     const token = jwt.sign(
       { ...userRest },
@@ -783,7 +870,7 @@ const server = http.createServer(app);
 // [Local]
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:4000",
+    origin: "http://localhost:2000",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -792,7 +879,7 @@ const io = new Server(server, {
 // // [Online]
 // const io = new Server(server, {
 //   cors: {
-//     origin: ["http://localhost:4000",
+//     origin: ["http://localhost:2000",
 //       "/\.ngrok-free\.app$/",],
 //     methods: ["GET", "POST"],
 //     credentials: true,
@@ -851,14 +938,21 @@ io.on("connection", async (socket) => {
     const { u_id, u_name } = socket.data.datas;
 
     try {
-      socket.join(r_id);
       const roomQuery = `
       select *
       from "Room"
       where "r_id" = $1;`;
       const room = await client.query(roomQuery, [r_id]);
       const roomData = room.rows[0];
-
+      if (roomData.r_players >= roomData.r_maxPlayers){
+        console.log("joinFaild emit!");
+        socket.emit("joinFaild");
+        return;
+      }
+      
+      console.log("joinSuccess emit!");
+      socket.emit("joinSuccess", {r_id});
+      socket.join(r_id);
       const playersQuery = `
       update "Room" 
       set "r_players" = "r_players" + 1
@@ -1108,7 +1202,8 @@ io.on("connection", async (socket) => {
       where "r_id" = $1;`
       const zones = await client.query(zonesQuery, [r_id]);
       const zonesData = zones.rows[0];
-
+      
+      StartTurnTimer(r_id);
       socket.emit("makeBoard", {
         b_player1: r_player1, b_player2: r_player2,
         zonesState: zonesData.b_zones,
@@ -1154,6 +1249,7 @@ io.on("connection", async (socket) => {
       returning *;`;
       const values = [`{${index}}`, JSON.stringify(playerColumn), index, turn + 1, r_id];
       const zones = await client.query(zonesQuery, values);
+      StartTurnTimer(r_id);
 
       io.to(r_id).emit("placeZone", { b_zones: zones.rows[0].b_zones, index: index });
 
@@ -1173,6 +1269,8 @@ io.on("connection", async (socket) => {
       where "r_id" = $1;`
       await client.query(endedQuery, [r_id]);
 
+      clearTimeout(roomsState.get(r_id).timer);
+      roomsState.get(r_id).timer = null;
       if (u_name === winner) UpdatePlayer(winner, true);
       else UpdatePlayer(loser, false);
 
@@ -1282,4 +1380,4 @@ server.listen(5000, () => {
 });
 
 // // [Online]
-// server.listen(5000, "0,0,0,0");
+// server.listen(4000, "0,0,0,0");

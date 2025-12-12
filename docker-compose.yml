@@ -2,9 +2,9 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: ./frontend/Dockerfile
+      doc kerfile: ./frontend/Dockerfile
     ports:
-      - "4000:80"
+      - "2000:80"
     container_name: frontend
     depends_on:
       - backend
@@ -14,8 +14,8 @@ services:
       context: .
       dockerfile: ./backend/Dockerfile
     ports:
-      - "2000:2000" # Express
-      - "5000:5000" # Socket.IO
+      - "5000:5000" # Express
+      - "4000:4000" # Socket.IO
     extra_hosts:
       - "host.docker.internal:host-gateway"
     container_name: backend
@@ -42,11 +42,11 @@ services:
 
   ngrok:
     image: ngrok/ngrok:latest
-    command: start --all --config /etc/ngrok.yml
-    environment:
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    command: start --all --config /ngrok.yml
+    env_file:
+      - .env
     volumes:
-      - ./ngrok.yml:/etc/ngrok.yml
+      - ./ngrok.yml:/ngrok.yml
     ports:
       - "4040:4040"
 

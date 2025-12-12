@@ -1,14 +1,9 @@
-import { useEffect, useState } from 'react';
-import '../styles/Sign_up.css'
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Sign_UpApi } from "../express";
+import '../styles/Sign_up.css'
 
 const Sign_up: React.FC = () => {
-    useEffect(() => {
-        fetch("http://localhost:5000/Sign_up")
-            .then((res) => res.json())
-            .then((data) => { console.log(data) })
-    }, []);
-
     const [u_id, setU_id] = useState("");
     const [u_password, setU_password] = useState("");
     const [u_verify_password, setU_verify_password] = useState("");
@@ -24,18 +19,8 @@ const Sign_up: React.FC = () => {
             alert("Not equal password.");
             return;
         }
-
-        const res = await fetch("http://localhost:5000/Sign_up", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ u_id, u_password, u_name }),
-        });
-
-        const data = await res.json();
-        console.log(data);
-
+        
+        const data = await Sign_UpApi(u_id, u_password, u_name);
         if (data.success) {
             alert(data.message);
             navigate('/Login');

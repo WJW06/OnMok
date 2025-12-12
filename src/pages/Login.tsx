@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ReloadToken, socket } from "../socket";
+import { ReloadToken } from "../socket";
+import { LoginApi } from "../express";
 import '../styles/Login.css'
 
 const Login: React.FC = () => {
@@ -13,16 +14,7 @@ const Login: React.FC = () => {
     }
 
     const Login = async () => {
-        const res = await fetch("http://localhost:5000/Login", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ u_id, u_password }),
-        });
-
-        const data = await res.json();
-        console.log("Login response:", data);
+        const data = await LoginApi(u_id, u_password);
         if (data.success) {
             if (!data.token) {
                 console.error("Server did not return a valid token:", data);
@@ -37,7 +29,6 @@ const Login: React.FC = () => {
         }
         else {
             alert(data.message);
-
         }
     };
 

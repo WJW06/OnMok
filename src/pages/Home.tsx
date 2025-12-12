@@ -6,6 +6,9 @@ import SettingsModal from "../components/SettingModal";
 import CreateBoxModal from "../components/CreateBoxModal";
 import { RoomInfo } from "./Room";
 import { ReloadToken, socket } from "../socket";
+import { GetUserInfoApi, GetRoomsInfoApi,
+        JoinRoomApi, CreateRoomApi,
+        RandomRoomApi, SearchRoomApi } from "../express";
 import "../styles/Home.css";
 
 export interface UserInfo {
@@ -38,20 +41,7 @@ const Home: React.FC = () => {
       }
       ReloadToken(token);
 
-      const res = await fetch("http://localhost:5000/GetUserInfo", {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!res.ok) {
-        localStorage.removeItem("token");
-        navigate("/Login");
-        return;
-      }
-
-      const data = await res.json();
+      const data = await GetUserInfoApi(token);
       if (data.success) {
         setUser(data.user);
       } else {
@@ -81,9 +71,7 @@ const Home: React.FC = () => {
 
   async function fetchRooms() {
     try {
-      const res = await fetch("http://localhost:5000/GetRoomsInfo");
-      const data = await res.json();
-
+      const data = await GetRoomsInfoApi();
       if (data.success) {
         console.log("data.rooms:", data.rooms);
         setRooms(data.rooms);
@@ -104,16 +92,7 @@ const Home: React.FC = () => {
       return;
     };
 
-    const res = await fetch("http://localhost:5000/JoinRoom", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ r_id: room.r_id }),
-    });
-
-    const data = await res.json();
+    const data = await JoinRoomApi(token, room.r_id);
     if (data.success) {
       localStorage.setItem("token", data.token);
       sessionStorage.setItem("currentRoom", room.r_id);
@@ -147,13 +126,7 @@ const Home: React.FC = () => {
   };
 
   const handleCreateRoom = async (room: RoomInfo) => {
-    const res = await fetch("http://localhost:5000/CreateRoom", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roomData: room }),
-    });
-
-    const data = await res.json();
+    const data = await CreateRoomApi(room);
 
     if (data.success) {
       socket.emit("createRoom", room);
@@ -165,12 +138,7 @@ const Home: React.FC = () => {
   };
 
   const handleRandomRoom = async () => {
-    const res = await fetch("http://localhost:5000/RandomRoom", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
-
-    const data = await res.json();
+    const data = await RandomRoomApi();
 
     if (data.success) {
       JoinRoom(data.room);
@@ -184,13 +152,7 @@ const Home: React.FC = () => {
   }
 
   async function SearchRoom(text: string) {
-    const res = await fetch("http://localhost:5000/SearchRoom", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text }),
-    });
-
-    const data = await res.json();
+    const data = await SearchRoomApi(text);
 
     if (data.success) {
       setRooms(data.rooms);

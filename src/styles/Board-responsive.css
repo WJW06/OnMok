@@ -18,7 +18,7 @@ screen and (min-height: 865px) and (max-height: 1080px) {
 
 
     /* [UI part css] */
-    .start-button {
+    .goRoom-button {
         width: 160px;
         height: 64px;
         font-size: 16pt;
@@ -77,7 +77,7 @@ screen and (min-height: 692px) and (max-height: 864px) {
 
 
     /* [UI part css] */
-    .start-button {
+    .goRoom-button {
         width: 130px;
         height: 52px;
         font-size: 13pt;
@@ -136,7 +136,7 @@ screen and (min-height: 554px) and (max-height: 691px) {
 
 
     /* [UI part css] */
-    .start-button {
+    .goRoom-button {
         width: 100px;
         height: 40px;
         font-size: 10pt;
@@ -195,7 +195,7 @@ screen and (max-height: 553px) {
 
 
     /* [UI part css] */
-    .start-button {
+    .goRoom-button {
         width: 80px;
         height: 32px;
         font-size: 8pt;

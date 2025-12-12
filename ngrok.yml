@@ -1,6 +1,14 @@
-authtoken: ${NGROK_AUTHTOKEN}
+version: "2"
 
 tunnels:
-  web:
+  frontend:
+    addr: frontend:80
     proto: http
-    addr: backend:2000
+
+  backend:
+    addr: backend:5000
+    proto: http
+
+  socket:
+    addr: backend:4000
+    proto: http

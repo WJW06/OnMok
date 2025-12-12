@@ -23,10 +23,6 @@ const Board: React.FC = () => {
   const [winnerMessage, setWinnerMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("http://localhost:5000/Ground")
-      .then((res) => res.json())
-      .then((data) => { console.log(data) })
-
     socket.on("makeBoard", ({ b_player1, b_player2, zonesState, turnState, b_isPlaying }) => {
       player1.current = b_player1;
       player2.current = b_player2;
@@ -43,9 +39,17 @@ const Board: React.FC = () => {
       window.playPlaceSound();
     });
 
+    socket.on("timeout", ()=> {
+      if (isPlaying.current){
+        if (turn.current % 2 === 0) CheckWinner(2);
+        else CheckWinner(1);
+      }
+    });
+
     return () => {
       socket.off("makeBoard");
       socket.off("placeZone");
+      socket.off("timeout");
       window.playMainBGM();
     }
   }, []);
@@ -120,7 +124,7 @@ const Board: React.FC = () => {
     if (isPlaying.current) return <></>;
 
     return (
-      <button className='start-button' onClick={handleGoRoom}>
+      <button className='goRoom-button' onClick={handleGoRoom}>
         Go Room
       </button>
     );
@@ -152,11 +156,11 @@ const Board: React.FC = () => {
 
     if (turn.current % 2 === 0) {
       player1Zones.current[index] = true;
-      if (++player1Count.current > 4) CheckWinner();
+      if (++player1Count.current > 4) CheckWinner(0);
     }
     else {
       player2Zones.current[index] = true;
-      if (++player2Count.current > 4) CheckWinner();
+      if (++player2Count.current > 4) CheckWinner(0);
     }
     ++turn.current;
 
@@ -282,22 +286,22 @@ const Board: React.FC = () => {
     else return 0;
   }
 
-  function CheckWinner() {
+  function CheckWinner(timeoutWinner: number) {
     const winner: number = CheckLine();
 
-    if (winner !== 0) {
-      const startButton = document.querySelector('.start-button');
-      if (startButton instanceof HTMLButtonElement) {
+    if (winner !== 0 || timeoutWinner !== 0) {
+      const goRoom_Button = document.querySelector('.goRoom-button');
+      if (goRoom_Button instanceof HTMLButtonElement) {
+        goRoom_Button.style.display = 'none';
         console.log("startButton none");
-        startButton.style.display = 'none';
       }
 
-      if (winner === 1) {
+      if (winner === 1 || timeoutWinner === 1) {
         setWinnerMessage(`${player1.current} Win!`);
         handleEndedGame(player1.current, player2.current);
       }
 
-      if (winner === 2) {
+      if (winner === 2 || timeoutWinner === 2) {
         setWinnerMessage(`${player2.current} Win!`);
         handleEndedGame(player2.current, player1.current);
       }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PlayerRank from "../components/PlayerRank";
 import { UserInfo } from "./Home";
+import { GettRankingInfoApi } from "../express";
 import "../styles/Ranking.css";
 
 const Ranking: React.FC = () => {
@@ -14,8 +15,7 @@ const Ranking: React.FC = () => {
 
     async function fetchRanking() {
         try {
-            const res = await fetch("http://localhost:5000/GetRankingInfo");
-            const data = await res.json();
+            const data = await GettRankingInfoApi();
 
             if (data.success) {
                 console.log("data.ranking:", data.ranking);
